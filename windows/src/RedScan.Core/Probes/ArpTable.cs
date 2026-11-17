@@ -12,6 +12,14 @@ public static class ArpTable
 
     private const int ERROR_INSUFFICIENT_BUFFER = 122;
 
+    /// <summary>MACs, die für sehr viele IPs gleichzeitig auftauchen, gehören zu einem Router/Cloud-Netz,
+    /// das ARP stellvertretend beantwortet (Proxy-ARP). Solche Einträge sind keine echten Geräte.</summary>
+    public static HashSet<string> ProxyMacs(IEnumerable<Entry> entries, int threshold = 16) =>
+        entries.GroupBy(e => e.Mac)
+               .Where(g => g.Select(e => e.Ip).Distinct().Count() > threshold)
+               .Select(g => g.Key)
+               .ToHashSet();
+
     public static List<Entry> Read()
     {
         var result = new List<Entry>();

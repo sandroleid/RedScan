@@ -103,6 +103,11 @@ jobs:
           $devices = Get-Content $dump -Raw | ConvertFrom-Json
           Write-Host "===== Scan-Ergebnis: $($devices.Count) Geräte ====="
           $devices | Select-Object Ip, Mac, Vendor, Kind, @{n='Ports';e={($_.OpenPorts | ForEach-Object Port) -join ' '}} | Format-Table -AutoSize | Out-String -Width 200
+          if ($devices.Count -gt 60) { Write-Error "Unplausibel viele Geräte ($($devices.Count)) – Proxy-ARP wird nicht gefiltert."; exit 1 }
+          $logSize = (Get-Item $log).Length
+          $problems = Select-String -Path $log -Pattern "FEHLER|Unbeobachtete" -SimpleMatch:$false
+          Write-Host "Loggröße: $logSize Bytes, Problemeinträge: $($problems.Count)"
+          if ($problems.Count -gt 0) { $problems | Select-Object -First 5 | ForEach-Object { $_.Line }; Write-Error "Fehler im Startprotokoll."; exit 1 }
           Start-Sleep -Seconds 2
           if ($p.HasExited) { Write-Error "App ist nach dem Scan abgestürzt."; exit 1 }
           Stop-Process $p -Force

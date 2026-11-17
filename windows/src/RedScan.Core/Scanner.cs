@@ -225,9 +225,15 @@ public sealed class Scanner
         List<ArpTable.Entry> entries;
         try { entries = ArpTable.Read(); } catch { entries = new(); }
         ArpBlocked = entries.Count == 0;
+        var proxy = ArpTable.ProxyMacs(entries.Where(e => InScope(e.Ip)));
         foreach (var e in entries)
-            if (InScope(e.Ip) || e.Ip == net.Ip)
-                Update(e.Ip, "ARP", d => { d.Mac = e.Mac; d.IsGateway = e.Ip == net.Gateway; });
+        {
+            if (!(InScope(e.Ip) || e.Ip == net.Ip)) continue;
+            bool isGateway = e.Ip == net.Gateway;
+            if (proxy.Contains(e.Mac) && !isGateway)
+                continue; // Stellvertreter-Antwort des Routers/der Cloud, kein eigenes Gerät
+            Update(e.Ip, "ARP", d => { d.Mac = e.Mac; d.IsGateway = isGateway; });
+        }
     }
 
     private async Task EnrichAsync(IReadOnlyList<string> ips, CancellationToken ct)

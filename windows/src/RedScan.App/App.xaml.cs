@@ -13,6 +13,7 @@ public partial class App : Application
 
     public App()
     {
+        try { if (File.Exists(LogPath) && new FileInfo(LogPath).Length > 1_000_000) File.Delete(LogPath); } catch { }
         Log("App-Start " + typeof(App).Assembly.GetName().Version);
         AppDomain.CurrentDomain.UnhandledException += (_, e) => Fatal("Unbehandelte Ausnahme", e.ExceptionObject as Exception);
         TaskScheduler.UnobservedTaskException += (_, e) => { Log("Unbeobachtete Task-Ausnahme: " + e.Exception); e.SetObserved(); };

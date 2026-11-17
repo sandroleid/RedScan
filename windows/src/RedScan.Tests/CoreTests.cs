@@ -199,6 +199,56 @@ public class WindowsApiTests
         => Assert.False(string.IsNullOrEmpty(Environment.MachineName));
 }
 
+public class NetworkProbeTests
+{
+    [Fact]
+    public void ProxyMacs_DetectsSharedMac()
+    {
+        var entries = new List<ArpTable.Entry>();
+        for (int i = 1; i <= 40; i++) entries.Add(new ArpTable.Entry($"10.1.0.{i}", "12:34:56:78:9A:BC"));
+        entries.Add(new ArpTable.Entry("10.1.0.200", "AA:BB:CC:00:00:01"));
+        var proxy = ArpTable.ProxyMacs(entries);
+        Assert.Contains("12:34:56:78:9A:BC", proxy);
+        Assert.DoesNotContain("AA:BB:CC:00:00:01", proxy);
+    }
+
+    [Fact]
+    public async Task Connect_OpenPort_Succeeds()
+    {
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        try
+        {
+            var open = await Ports.ScanAsync("127.0.0.1", new[] { port });
+            Assert.Equal(new[] { port }, open.ToArray());
+        }
+        finally { listener.Stop(); }
+    }
+
+    [Fact]
+    public async Task Connect_Timeout_ReturnsNullWithoutUnobservedExceptions()
+    {
+        int unobserved = 0;
+        EventHandler<UnobservedTaskExceptionEventArgs> h = (_, e) => { Interlocked.Increment(ref unobserved); e.SetObserved(); };
+        TaskScheduler.UnobservedTaskException += h;
+        try
+        {
+            // 192.0.2.0/24 ist ein reserviertes Test-Netz – Verbindungen laufen ins Leere
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var open = await Ports.ScanAsync("192.0.2.1", new[] { 80, 443, 22, 8080 }, timeoutMs: 400);
+            sw.Stop();
+            Assert.Empty(open);
+            Assert.True(sw.ElapsedMilliseconds < 5000, $"Scan dauerte {sw.ElapsedMilliseconds} ms");
+            GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect();
+            await Task.Delay(300);
+            GC.Collect(); GC.WaitForPendingFinalizers();
+            Assert.Equal(0, unobserved);
+        }
+        finally { TaskScheduler.UnobservedTaskException -= h; }
+    }
+}
+
 public class HistoryTests
 {
     [Fact]

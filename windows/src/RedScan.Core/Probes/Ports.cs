@@ -43,6 +43,25 @@ public static class Ports
 
     public static string Label(int p) => Names.GetValueOrDefault(p, "Unbekannt");
 
+    /// <summary>Baut eine TCP-Verbindung mit Zeitlimit auf. Der Versuch wird bei Zeitüberschreitung
+    /// sauber abgebrochen (keine zurückgelassenen, später fehlschlagenden Tasks).</summary>
+    public static async Task<TcpClient?> ConnectAsync(string ip, int port, int timeoutMs, CancellationToken ct = default)
+    {
+        var client = new TcpClient(AddressFamily.InterNetwork);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(timeoutMs);
+        try
+        {
+            await client.ConnectAsync(IPAddress.Parse(ip), port, cts.Token).ConfigureAwait(false);
+            if (client.Connected) return client;
+        }
+        catch (OperationCanceledException) { }
+        catch (SocketException) { }
+        catch (ObjectDisposedException) { }
+        client.Dispose();
+        return null;
+    }
+
     /// <summary>Paralleler TCP-Connect-Scan eines Hosts.</summary>
     public static async Task<List<int>> ScanAsync(string ip, IReadOnlyList<int> ports, int timeoutMs = 800, int concurrency = 400, CancellationToken ct = default)
     {
@@ -52,21 +71,18 @@ public static class Ports
         foreach (var port in ports)
         {
             if (ct.IsCancellationRequested) break;
-            await gate.WaitAsync(ct).ConfigureAwait(false);
+            try { await gate.WaitAsync(ct).ConfigureAwait(false); } catch (OperationCanceledException) { break; }
             tasks.Add(Task.Run(async () =>
             {
                 try
                 {
-                    using var client = new TcpClient(AddressFamily.InterNetwork);
-                    var connect = client.ConnectAsync(IPAddress.Parse(ip), port);
-                    var done = await Task.WhenAny(connect, Task.Delay(timeoutMs, ct)).ConfigureAwait(false);
-                    if (done == connect && client.Connected) open.Add(port);
+                    using var client = await ConnectAsync(ip, port, timeoutMs, ct).ConfigureAwait(false);
+                    if (client != null) open.Add(port);
                 }
-                catch { }
                 finally { gate.Release(); }
-            }, ct));
+            }));
         }
-        try { await Task.WhenAll(tasks).ConfigureAwait(false); } catch { }
+        await Task.WhenAll(tasks).ConfigureAwait(false);
         return open.OrderBy(x => x).ToList();
     }
 
@@ -75,10 +91,8 @@ public static class Ports
     {
         try
         {
-            using var client = new TcpClient(AddressFamily.InterNetwork);
-            var connect = client.ConnectAsync(IPAddress.Parse(ip), port);
-            if (await Task.WhenAny(connect, Task.Delay(timeoutMs, ct)).ConfigureAwait(false) != connect || !client.Connected)
-                return null;
+            using var client = await ConnectAsync(ip, port, timeoutMs, ct).ConfigureAwait(false);
+            if (client is null) return null;
             using var stream = client.GetStream();
             stream.ReadTimeout = timeoutMs;
             var buffer = new byte[2048];
