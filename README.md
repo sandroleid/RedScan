@@ -29,7 +29,7 @@ Alle Downloads findest du unter [Releases](https://github.com/sandroleid/RedScan
 
 ### macOS
 
-1. Das neueste macOS-Release (Tag `v…`) öffnen, `RedScan-<Version>.zip` herunterladen und entpacken.
+1. Das neueste Release **RedScan-macOS** (Tag `v…`) öffnen, `RedScan-macOS-<Version>.zip` herunterladen und entpacken.
 2. `RedScan.app` nach **Programme** ziehen.
 3. Die App ist nicht von Apple notarisiert. Beim ersten Start daher **Rechtsklick → Öffnen** oder im Terminal:
    ```sh
