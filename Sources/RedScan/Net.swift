@@ -72,7 +72,7 @@ enum IPv4 {
     static func prefixLength(_ mask: UInt32) -> Int { mask.nonzeroBitCount }
 
     /// Liefert die Host-Adressen eines Netzes "a.b.c.d/n".
-    static func hosts(cidr: String, limit: Int = 4096) -> [String]? {
+    static func hosts(cidr: String, limit: Int = 65_534) -> [String]? {
         let parts = cidr.trimmingCharacters(in: .whitespaces).split(separator: "/")
         guard let base = toUInt32(String(parts[0])) else { return nil }
         let prefix = parts.count > 1 ? Int(parts[1]) ?? 32 : 32
@@ -207,12 +207,16 @@ enum NetworkDetector {
         let prefix = IPv4.prefixLength(addr.mask)
         var cidr = "\(IPv4.toString(addr.ip & addr.mask))/\(prefix)"
         var note: String?
-        if prefix < 22 {
-            cidr = "\(IPv4.toString(addr.ip & 0xFFFF_FF00))/24"
-            note = "Großes Netz (/\(prefix)) – es wird nur das eigene /24 gescannt. Eigenes Ziel unten eintragen."
+        if prefix < 16 {
+            cidr = "\(IPv4.toString(addr.ip & 0xFFFF_0000))/16"
+            note = "Sehr großes Netz (/\(prefix)) – es wird das eigene /16 gescannt. Eigenes Ziel unten eintragen."
         }
         if let c = customCIDR?.trimmingCharacters(in: .whitespaces), !c.isEmpty {
-            if IPv4.hosts(cidr: c) != nil { cidr = c; note = nil } else { note = "Ungültiges Ziel „\(c)“ (erlaubt: /16 bis /32, max. 4096 Hosts)." }
+            if IPv4.hosts(cidr: c) != nil { cidr = c; note = nil } else { note = "Ungültiges Ziel „\(c)“ (erlaubt: /16 bis /32)." }
+        }
+        let count = IPv4.hosts(cidr: cidr)?.count ?? 0
+        if note == nil && count > 1024 {
+            note = "Großes Netz: \(count.formatted()) Adressen – der Ping-Sweep dauert ca. \(count / 2000 + 3) s."
         }
 
         let dnsOut = Shell.run("/usr/sbin/scutil", ["--dns"])

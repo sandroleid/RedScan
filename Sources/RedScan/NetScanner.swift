@@ -145,29 +145,26 @@ final class NetScanner: ObservableObject {
             d.isSelf = true; d.mac = net.mac; d.latencyMs = 0
         }
 
-        // 1. Ping-Sweep
+        // 0. Geräte, die der Mac schon kennt, sofort anzeigen
+        await applyARP(net)
+
+        // 1. Ping-Sweep (schneller ICMP-Sweep, Rückfall auf ping-Prozesse)
         let hosts = net.hosts.filter { $0 != net.ip }
-        phase = "Ping-Sweep über \(hosts.count) Adressen …"
-        var done = 0
-        await withTaskGroup(of: (String, PingResult?).self) { group in
-            var it = hosts.makeIterator()
-            for _ in 0..<64 {
-                guard let h = it.next() else { break }
-                group.addTask { (h, await offMain { Ping.ping(h) }) }
-            }
-            for await (ip, r) in group {
-                if Task.isCancelled { group.cancelAll(); break }
-                done += 1
-                progress = 0.35 * Double(done) / Double(max(hosts.count, 1))
-                if let r {
-                    update(ip, source: "Ping") { d in
-                        d.latencyMs = r.time; d.ttl = r.ttl
-                        d.isGateway = ip == net.gateway
-                    }
-                }
-                if let n = it.next() { group.addTask { (n, await offMain { Ping.ping(n) }) } }
-            }
+        phase = "Ping-Sweep über \(hosts.count.formatted()) Adressen …"
+        let sweeper = ICMPSweeper()
+        async let sweepOK = offMain { sweeper.run(hosts, rate: 2000, wait: 2.0) }
+        var ticks = 0
+        while !sweeper.finished {
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            if Task.isCancelled { sweeper.cancel() }
+            applyPings(sweeper.drain(), net)
+            progress = 0.35 * Double(sweeper.sent) / Double(max(hosts.count, 1))
+            ticks += 1
+            if ticks % 8 == 0 { await applyARP(net) } // Ping-blockierende Geräte live einblenden
         }
+        let ok = await sweepOK
+        applyPings(sweeper.drain(), net)
+        if !ok && hosts.count <= 2048 { await processPingSweep(hosts, net) }
         if Task.isCancelled { return }
 
         // 2. ARP-Tabelle – findet auch Geräte, die Ping blockieren
@@ -231,7 +228,7 @@ final class NetScanner: ObservableObject {
         var scanned = 0
         await withTaskGroup(of: (String, [Int]).self) { group in
             var it = targets.makeIterator()
-            for _ in 0..<8 {
+            for _ in 0..<16 {
                 guard let ip = it.next() else { break }
                 group.addTask { (ip, await offMain { Ports.scan(ip: ip, ports: Ports.common) }) }
             }
@@ -262,6 +259,35 @@ final class NetScanner: ObservableObject {
         if let i = args.firstIndex(of: "--dump"), i + 1 < args.count {
             let enc = JSONEncoder(); enc.outputFormatting = [.prettyPrinted, .sortedKeys]; enc.dateEncodingStrategy = .iso8601
             try? enc.encode(sortedDevices).write(to: URL(fileURLWithPath: args[i + 1]))
+        }
+    }
+
+    private func applyPings(_ results: [(String, PingResult)], _ net: NetworkInfo) {
+        for (ip, r) in results {
+            update(ip, source: "Ping") { d in
+                d.latencyMs = r.time
+                if r.ttl > 0 { d.ttl = r.ttl }
+                d.isGateway = ip == net.gateway
+            }
+        }
+    }
+
+    /// Alter Weg: ein ping-Prozess pro Adresse (nur falls kein ICMP-Socket verfügbar ist).
+    private func processPingSweep(_ hosts: [String], _ net: NetworkInfo) async {
+        var done = 0
+        await withTaskGroup(of: (String, PingResult?).self) { group in
+            var it = hosts.makeIterator()
+            for _ in 0..<64 {
+                guard let h = it.next() else { break }
+                group.addTask { (h, await offMain { Ping.ping(h) }) }
+            }
+            for await (ip, r) in group {
+                if Task.isCancelled { group.cancelAll(); break }
+                done += 1
+                progress = 0.35 * Double(done) / Double(max(hosts.count, 1))
+                if let r { applyPings([(ip, r)], net) }
+                if let n = it.next() { group.addTask { (n, await offMain { Ping.ping(n) }) } }
+            }
         }
     }
 

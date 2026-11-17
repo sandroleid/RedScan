@@ -450,3 +450,105 @@ enum Web {
         return String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
+
+// MARK: - Schneller ICMP-Sweep (für große Netze)
+
+/// Schickt Echo-Requests an viele Adressen über einen einzigen unprivilegierten ICMP-Socket
+/// (ohne einen `ping`-Prozess pro Adresse) und sammelt die Antworten parallel ein.
+/// Nebeneffekt: Der Kernel löst dabei jede Adresse per ARP auf – so landen auch Geräte,
+/// die Ping blockieren, in der ARP-Tabelle.
+final class ICMPSweeper {
+    private let lock = NSLock()
+    private var found: [(String, PingResult)] = []
+    private var sendTimes: [String: Date] = [:]
+    private var _sent = 0
+    private var _cancelled = false
+    private var _finished = false
+
+    var sent: Int { lock.lock(); defer { lock.unlock() }; return _sent }
+    var finished: Bool { lock.lock(); defer { lock.unlock() }; return _finished }
+    func cancel() { lock.lock(); _cancelled = true; lock.unlock() }
+    private var cancelled: Bool { lock.lock(); defer { lock.unlock() }; return _cancelled }
+
+    /// Neue Antworten seit dem letzten Aufruf.
+    func drain() -> [(String, PingResult)] {
+        lock.lock(); defer { lock.unlock() }
+        let r = found; found = []; return r
+    }
+
+    /// Blockiert bis alle Pakete gesendet sind und `wait` Sekunden auf Nachzügler gewartet wurde.
+    /// Gibt `false` zurück, wenn kein ICMP-Socket geöffnet werden konnte.
+    func run(_ hosts: [String], rate: Int = 2000, wait: Double = 2.0) -> Bool {
+        defer { lock.lock(); _finished = true; lock.unlock() }
+        let fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_ICMP)
+        guard fd >= 0 else { return false }
+        defer { close(fd) }
+        var rcvbuf: Int32 = 8 * 1024 * 1024
+        setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &rcvbuf, socklen_t(MemoryLayout<Int32>.size))
+
+        let stopLock = NSLock()
+        var stop = false
+        let receiverDone = DispatchSemaphore(value: 0)
+        DispatchQueue.global(qos: .userInitiated).async { [self] in
+            var buf = [UInt8](repeating: 0, count: 2048)
+            while true {
+                stopLock.lock(); let s = stop; stopLock.unlock()
+                if s { break }
+                var pfd = pollfd(fd: fd, events: Int16(POLLIN), revents: 0)
+                guard poll(&pfd, 1, 100) > 0 else { continue }
+                var from = sockaddr_in()
+                var len = socklen_t(MemoryLayout<sockaddr_in>.size)
+                let n = withUnsafeMutablePointer(to: &from) {
+                    $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { recvfrom(fd, &buf, buf.count, 0, $0, &len) }
+                }
+                guard n >= 8 else { continue }
+                // macOS liefert bei ICMP-Datagram-Sockets den IP-Header mit
+                var off = 0, ttl = 0
+                if n >= 20, buf[0] >> 4 == 4 { off = Int(buf[0] & 0x0F) * 4; ttl = Int(buf[8]) }
+                guard n >= off + 8, buf[off] == 0 else { continue } // 0 = Echo Reply
+                let ip = IPv4.string(from.sin_addr)
+                let now = Date()
+                lock.lock()
+                if let t = sendTimes.removeValue(forKey: ip) {
+                    found.append((ip, PingResult(ttl: ttl, time: now.timeIntervalSince(t) * 1000)))
+                }
+                lock.unlock()
+            }
+            receiverDone.signal()
+        }
+
+        let ident = UInt16(truncatingIfNeeded: getpid())
+        let batch = max(rate / 50, 1) // alle 20 ms ein Bündel
+        for (i, host) in hosts.enumerated() {
+            if cancelled { break }
+            let seq = UInt16(truncatingIfNeeded: i)
+            var pkt: [UInt8] = [8, 0, 0, 0, UInt8(ident >> 8), UInt8(ident & 0xFF), UInt8(seq >> 8), UInt8(seq & 0xFF)]
+            pkt += Array("RedScan-sweep-01".utf8)
+            var sum: UInt32 = 0
+            for j in stride(from: 0, to: pkt.count, by: 2) { sum += UInt32(pkt[j]) << 8 | UInt32(pkt[j + 1]) }
+            while sum >> 16 != 0 { sum = (sum & 0xFFFF) + (sum >> 16) }
+            let ck = ~UInt16(sum)
+            pkt[2] = UInt8(ck >> 8); pkt[3] = UInt8(ck & 0xFF)
+
+            var addr = sockaddr_in.make(host, 0)
+            lock.lock(); sendTimes[host] = Date(); lock.unlock()
+            for _ in 0..<5 {
+                let r = withUnsafePointer(to: &addr) {
+                    $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                        sendto(fd, pkt, pkt.count, 0, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+                    }
+                }
+                if r >= 0 || (errno != ENOBUFS && errno != EAGAIN) { break }
+                usleep(5_000) // Sendepuffer voll – kurz warten
+            }
+            lock.lock(); _sent = i + 1; lock.unlock()
+            if (i + 1) % batch == 0 { usleep(20_000) }
+        }
+
+        let deadline = Date().addingTimeInterval(wait)
+        while Date() < deadline && !cancelled { usleep(50_000) }
+        stopLock.lock(); stop = true; stopLock.unlock()
+        receiverDone.wait()
+        return true
+    }
+}
