@@ -1,0 +1,403 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="RedScan.App.RootView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:core="using:RedScan.Core"
+    xmlns:local="using:RedScan.App"
+    mc:Ignorable="d"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006">
+
+    <Grid Background="{StaticResource BgBrush}">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="300" />
+            <ColumnDefinition Width="1" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ============ SEITENLEISTE ============ -->
+        <ScrollViewer Grid.Column="0" Background="{StaticResource PanelBrush}">
+            <StackPanel Padding="18" Spacing="16">
+                <!-- Kopf -->
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <Border Width="36" Height="36" CornerRadius="9" Background="{StaticResource RedGradient}">
+                        <FontIcon Glyph="&#xEC05;" FontFamily="Segoe Fluent Icons" Foreground="White" FontSize="18" />
+                    </Border>
+                    <StackPanel>
+                        <TextBlock Text="RedScan" FontSize="20" FontWeight="Bold" />
+                        <TextBlock Text="Netzwerk-Scanner" FontSize="11" Foreground="{StaticResource DimBrush}" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Navigation -->
+                <Grid ColumnSpacing="6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Button Grid.Column="0" Click="OnShowDevices" HorizontalAlignment="Stretch"
+                            Background="{x:Bind VM.DevicesVisible, Mode=OneWay, Converter={StaticResource NavBg}}"
+                            Foreground="White" CornerRadius="9" Padding="8">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE80A;" FontFamily="Segoe Fluent Icons" FontSize="13" />
+                            <TextBlock Text="Geräte" FontSize="12" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="1" Click="OnShowHistory" HorizontalAlignment="Stretch"
+                            Background="{x:Bind VM.HistoryVisible, Mode=OneWay, Converter={StaticResource NavBg}}"
+                            Foreground="White" CornerRadius="9" Padding="8">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE81C;" FontFamily="Segoe Fluent Icons" FontSize="13" />
+                            <TextBlock Text="Verlauf" FontSize="12" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+
+                <!-- Scan-Steuerung -->
+                <Button Style="{StaticResource RedButton}" Command="{x:Bind VM.ScanCommand}"
+                        Content="{x:Bind VM.ScanButtonText, Mode=OneWay}" />
+
+                <StackPanel Spacing="6">
+                    <ProgressBar Value="{x:Bind VM.Progress, Mode=OneWay}" Maximum="1" Foreground="{StaticResource RedBrush}" />
+                    <TextBlock Text="{x:Bind VM.Phase, Mode=OneWay}" FontSize="11" Foreground="{StaticResource DimBrush}" TextWrapping="Wrap" />
+                </StackPanel>
+
+                <!-- Hinweis fehlende Berechtigung / großes Netz -->
+                <Border Background="#22E82230" BorderBrush="#73E82230" BorderThickness="1" CornerRadius="12" Padding="12"
+                        Visibility="{x:Bind VM.ArpBlocked, Mode=OneWay, Converter={StaticResource BoolVis}}">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Zugriff eingeschränkt" FontWeight="Bold" Foreground="{StaticResource RedBrightBrush}" FontSize="12" />
+                        <TextBlock Text="Die ARP-Tabelle ist leer – MAC-Adressen und Hersteller fehlen möglicherweise."
+                                   FontSize="11" Foreground="{StaticResource DimBrush}" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Ziel -->
+                <TextBox PlaceholderText="Ziel, z. B. 192.168.1.0/24"
+                         Text="{x:Bind VM.CustomTarget, Mode=TwoWay}"
+                         Background="#40000000" />
+
+                <!-- Netzwerk-Infos -->
+                <Border Style="{StaticResource CardBorder}">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="NETZWERK" Style="{StaticResource SectionLabel}" />
+                        <StackPanel Orientation="Horizontal" Spacing="8" Visibility="{x:Bind VM.HasSsid, Mode=OneWay, Converter={StaticResource BoolVis}}">
+                            <TextBlock Text="WLAN" Width="74" FontSize="11" Foreground="{StaticResource DimBrush}" />
+                            <TextBlock Text="{x:Bind VM.NetSsid, Mode=OneWay}" FontSize="11" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Interface" Width="74" FontSize="11" Foreground="{StaticResource DimBrush}" />
+                            <TextBlock Text="{x:Bind VM.NetInterface, Mode=OneWay}" FontSize="11" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Eigene IP" Width="74" FontSize="11" Foreground="{StaticResource DimBrush}" />
+                            <TextBlock Text="{x:Bind VM.NetIp, Mode=OneWay}" FontSize="11" FontFamily="Consolas" IsTextSelectionEnabled="True" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="MAC" Width="74" FontSize="11" Foreground="{StaticResource DimBrush}" />
+                            <TextBlock Text="{x:Bind VM.NetMac, Mode=OneWay}" FontSize="11" FontFamily="Consolas" IsTextSelectionEnabled="True" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Subnetz" Width="74" FontSize="11" Foreground="{StaticResource DimBrush}" />
+                            <TextBlock Text="{x:Bind VM.NetCidr, Mode=OneWay}" FontSize="11" FontFamily="Consolas" IsTextSelectionEnabled="True" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Gateway" Width="74" FontSize="11" Foreground="{StaticResource DimBrush}" />
+                            <TextBlock Text="{x:Bind VM.NetGateway, Mode=OneWay}" FontSize="11" FontFamily="Consolas" IsTextSelectionEnabled="True" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="DNS" Width="74" FontSize="11" Foreground="{StaticResource DimBrush}" />
+                            <TextBlock Text="{x:Bind VM.NetDns, Mode=OneWay}" FontSize="11" FontFamily="Consolas" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Hosts" Width="74" FontSize="11" Foreground="{StaticResource DimBrush}" />
+                            <TextBlock Text="{x:Bind VM.NetHosts, Mode=OneWay}" FontSize="11" />
+                        </StackPanel>
+                        <TextBlock Text="{x:Bind VM.NetNote, Mode=OneWay}" FontSize="10" Foreground="{StaticResource RedBrightBrush}" TextWrapping="Wrap"
+                                   Visibility="{x:Bind VM.HasNote, Mode=OneWay, Converter={StaticResource BoolVis}}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Statistik -->
+                <Grid ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Style="{StaticResource CardBorder}" Padding="8">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="{x:Bind VM.DeviceCount, Mode=OneWay}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource RedBrightBrush}" HorizontalAlignment="Center" />
+                            <TextBlock Text="Geräte" FontSize="10" Foreground="{StaticResource DimBrush}" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="1" Style="{StaticResource CardBorder}" Padding="8">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="{x:Bind VM.TotalOpenPorts, Mode=OneWay}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource RedBrightBrush}" HorizontalAlignment="Center" />
+                            <TextBlock Text="Ports" FontSize="10" Foreground="{StaticResource DimBrush}" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="2" Style="{StaticResource CardBorder}" Padding="8">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="{x:Bind VM.TotalServices, Mode=OneWay}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource RedBrightBrush}" HorizontalAlignment="Center" />
+                            <TextBlock Text="Dienste" FontSize="10" Foreground="{StaticResource DimBrush}" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Rectangle Grid.Column="1" Fill="{StaticResource StrokeBrush}" />
+
+        <!-- ============ HAUPTBEREICH ============ -->
+        <Grid Grid.Column="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- Kopfzeile -->
+            <Grid Grid.Row="0" Padding="20,24,20,12" ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock Text="{x:Bind VM.ShowHistory, Mode=OneWay, Converter={StaticResource TabTitle}}" FontSize="24" FontWeight="Bold" />
+                    <TextBlock Text="{x:Bind VM.Subtitle, Mode=OneWay}" FontSize="11" Foreground="{StaticResource DimBrush}" />
+                </StackPanel>
+                <TextBox Grid.Column="1" Width="260" PlaceholderText="Suchen: IP, Name, Hersteller, Port …"
+                         TextChanged="OnSearchChanged" VerticalAlignment="Center" Background="{StaticResource CardBrush}" />
+                <Button Grid.Column="2" Style="{StaticResource GhostButton}" VerticalAlignment="Center">
+                    <FontIcon Glyph="&#xEDE1;" FontFamily="Segoe Fluent Icons" FontSize="14" />
+                    <Button.Flyout>
+                        <MenuFlyout>
+                            <MenuFlyoutItem Text="Als JSON exportieren …" Command="{x:Bind VM.ExportJsonCommand}" />
+                            <MenuFlyoutItem Text="Als CSV exportieren …" Command="{x:Bind VM.ExportCsvCommand}" />
+                        </MenuFlyout>
+                    </Button.Flyout>
+                </Button>
+            </Grid>
+
+            <!-- Geräte -->
+            <ScrollViewer Grid.Row="1" Visibility="{x:Bind VM.DevicesVisible, Mode=OneWay, Converter={StaticResource BoolVis}}">
+                <GridView ItemsSource="{x:Bind VM.Devices}" SelectionMode="Single" Padding="20"
+                          SelectionChanged="OnDeviceSelected" IsItemClickEnabled="False">
+                    <GridView.ItemTemplate>
+                        <DataTemplate x:DataType="core:Device">
+                            <Border Width="240" Margin="0,0,14,14" Background="{StaticResource CardBrush}"
+                                    BorderBrush="{StaticResource StrokeBrush}" BorderThickness="1" CornerRadius="16" Padding="14">
+                                <StackPanel Spacing="10">
+                                    <Grid>
+                                        <Border Width="42" Height="42" CornerRadius="12" Background="{StaticResource RedGradient}" HorizontalAlignment="Left">
+                                            <FontIcon Glyph="{x:Bind Kind, Converter={StaticResource KindGlyph}}" FontFamily="Segoe Fluent Icons" Foreground="White" FontSize="19" />
+                                        </Border>
+                                        <Border HorizontalAlignment="Right" VerticalAlignment="Top" CornerRadius="8" Padding="7,3"
+                                                Background="{StaticResource RedGradient}"
+                                                Visibility="{x:Bind IsGateway, Converter={StaticResource BoolVis}}">
+                                            <TextBlock Text="Gateway" FontSize="10" FontWeight="SemiBold" Foreground="White" />
+                                        </Border>
+                                    </Grid>
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="{x:Bind DisplayName}" FontSize="14" FontWeight="Bold" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{x:Bind Ip}" FontSize="12" FontFamily="Consolas" Foreground="{StaticResource RedBrightBrush}" />
+                                        <TextBlock Text="{x:Bind VendorDisplay}" FontSize="11" Foreground="{StaticResource DimBrush}" TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <Border CornerRadius="10" Padding="7,3" Background="#24E82230">
+                                            <TextBlock Text="{x:Bind Kind, Converter={StaticResource KindLabel}}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource RedBrightBrush}" />
+                                        </Border>
+                                        <Border CornerRadius="10" Padding="7,3" Background="#24E82230">
+                                            <TextBlock Text="{x:Bind PortCountText}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource RedBrightBrush}" />
+                                        </Border>
+                                        <TextBlock Text="{x:Bind LatencyText}" FontSize="10" FontFamily="Consolas" Foreground="{StaticResource FaintBrush}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </GridView.ItemTemplate>
+                    <GridView.ItemContainerStyle>
+                        <Style TargetType="GridViewItem">
+                            <Setter Property="Padding" Value="0" />
+                            <Setter Property="Margin" Value="0" />
+                        </Style>
+                    </GridView.ItemContainerStyle>
+                </GridView>
+            </ScrollViewer>
+
+            <!-- Verlauf -->
+            <Grid Grid.Row="1" Padding="20,0,20,20" Visibility="{x:Bind VM.HistoryVisible, Mode=OneWay, Converter={StaticResource BoolVis}}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="320" />
+                </Grid.ColumnDefinitions>
+
+                <ListView Grid.Column="0" ItemsSource="{x:Bind VM.KnownDevices}" SelectionMode="None">
+                    <ListView.ItemTemplate>
+                        <DataTemplate x:DataType="core:KnownDevice">
+                            <Border Margin="0,0,12,6" Background="{StaticResource CardBrush}" BorderBrush="{StaticResource StrokeBrush}"
+                                    BorderThickness="1" CornerRadius="11" Padding="12">
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Grid.Column="0" Width="30" Height="30" CornerRadius="9" Background="{StaticResource RedGradient}">
+                                        <FontIcon Glyph="{x:Bind Kind, Converter={StaticResource KindGlyph}}" FontFamily="Segoe Fluent Icons" Foreground="White" FontSize="14" />
+                                    </Border>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="{x:Bind Name}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{x:Bind SubText}" FontSize="10" Foreground="{StaticResource DimBrush}" TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                        <TextBlock Text="{x:Bind LastIp}" FontSize="12" FontFamily="Consolas" Foreground="{StaticResource RedBrightBrush}" />
+                                        <TextBlock Text="{x:Bind StatusText}" FontSize="10" Foreground="{StaticResource FaintBrush}" />
+                                    </StackPanel>
+                                    <Button Grid.Column="3" Style="{StaticResource GhostButton}" VerticalAlignment="Center"
+                                            Click="OnWakeKnown" Tag="{x:Bind}"
+                                            Visibility="{x:Bind HasMac, Converter={StaticResource BoolVis}}">
+                                        <StackPanel Orientation="Horizontal" Spacing="5">
+                                            <FontIcon Glyph="&#xE7E8;" FontFamily="Segoe Fluent Icons" FontSize="12" />
+                                            <TextBlock Text="Aufwecken" FontSize="11" />
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+
+                <StackPanel Grid.Column="1" Spacing="8">
+                    <Grid>
+                        <TextBlock Text="SCANS" Style="{StaticResource SectionLabel}" VerticalAlignment="Center" />
+                        <Button HorizontalAlignment="Right" Style="{StaticResource GhostButton}" Padding="8,5"
+                                Command="{x:Bind VM.ClearHistoryCommand}">
+                            <FontIcon Glyph="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="12" />
+                        </Button>
+                    </Grid>
+                    <ListView ItemsSource="{x:Bind VM.Scans}" SelectionMode="None">
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="core:ScanRecord">
+                                <Border Margin="0,0,0,6" Background="{StaticResource CardBrush}" BorderBrush="{StaticResource StrokeBrush}"
+                                        BorderThickness="1" CornerRadius="12" Padding="12">
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Text="{x:Bind Title}" FontSize="12" FontWeight="SemiBold" />
+                                        <TextBlock Text="{x:Bind Sub}" FontSize="10" Foreground="{StaticResource FaintBrush}" TextWrapping="Wrap" />
+                                        <TextBlock Text="{x:Bind ChangesText}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource RedBrightBrush}"
+                                                   Visibility="{x:Bind HasChanges, Converter={StaticResource BoolVis}}" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </StackPanel>
+            </Grid>
+        </Grid>
+
+        <!-- ============ DETAILBEREICH ============ -->
+        <Border Grid.Column="3" Width="390" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource StrokeBrush}" BorderThickness="1,0,0,0"
+                Visibility="{x:Bind VM.DetailVisible, Mode=OneWay, Converter={StaticResource BoolVis}}">
+            <ScrollViewer>
+                <StackPanel Padding="18" Spacing="16">
+                    <Grid>
+                        <Border Width="58" Height="58" CornerRadius="16" Background="{StaticResource RedGradient}" HorizontalAlignment="Left">
+                            <FontIcon Glyph="{x:Bind VM.SelectedDevice.Kind, Mode=OneWay, Converter={StaticResource KindGlyph}}" FontFamily="Segoe Fluent Icons" Foreground="White" FontSize="26" />
+                        </Border>
+                        <Button HorizontalAlignment="Right" VerticalAlignment="Top" Click="OnCloseDetail"
+                                Background="{StaticResource CardBrush}" CornerRadius="20" Padding="8">
+                            <FontIcon Glyph="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12" Foreground="{StaticResource DimBrush}" />
+                        </Button>
+                    </Grid>
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="{x:Bind VM.SelectedDevice.DisplayName, Mode=OneWay}" FontSize="20" FontWeight="Bold" IsTextSelectionEnabled="True" TextWrapping="Wrap" />
+                        <TextBlock Text="{x:Bind VM.SelectedDevice.Ip, Mode=OneWay}" FontSize="14" FontFamily="Consolas" Foreground="{StaticResource RedBrightBrush}" IsTextSelectionEnabled="True" />
+                        <TextBlock Text="{x:Bind VM.SelectedOsGuess, Mode=OneWay}" FontSize="12" Foreground="{StaticResource DimBrush}"
+                                   Visibility="{x:Bind VM.SelectedOsGuess, Mode=OneWay, Converter={StaticResource TextVis}}" />
+                    </StackPanel>
+
+                    <!-- Aktionen -->
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Style="{StaticResource RedButton}" HorizontalAlignment="Left" Command="{x:Bind VM.DeepScanCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE773;" FontFamily="Segoe Fluent Icons" FontSize="13" />
+                                <TextBlock Text="Tiefenscan" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource GhostButton}" Command="{x:Bind VM.WakeCommand}">
+                            <FontIcon Glyph="&#xE7E8;" FontFamily="Segoe Fluent Icons" FontSize="14" />
+                        </Button>
+                    </StackPanel>
+
+                    <!-- Identität -->
+                    <Border Style="{StaticResource CardBorder}">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="IDENTITÄT" Style="{StaticResource SectionLabel}" />
+                            <local:DetailRow Label="Typ" Value="{x:Bind VM.SelectedDevice.Kind, Mode=OneWay, Converter={StaticResource KindLabel}}" />
+                            <local:DetailRow Label="Hersteller" Value="{x:Bind VM.SelectedDevice.Vendor, Mode=OneWay}" />
+                            <local:DetailRow Label="MAC" Value="{x:Bind VM.SelectedDevice.Mac, Mode=OneWay}" Mono="True" />
+                            <local:DetailRow Label="Hostname" Value="{x:Bind VM.SelectedDevice.Hostname, Mode=OneWay}" Mono="True" />
+                            <local:DetailRow Label="mDNS-Name" Value="{x:Bind VM.SelectedDevice.MdnsName, Mode=OneWay}" Mono="True" />
+                            <local:DetailRow Label="NetBIOS" Value="{x:Bind VM.SelectedDevice.NetbiosName, Mode=OneWay}" Mono="True" />
+                            <local:DetailRow Label="Verlauf" Value="{x:Bind VM.SelectedHistoryText, Mode=OneWay}" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Offene Ports -->
+                    <Border Style="{StaticResource CardBorder}">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="OFFENE PORTS" Style="{StaticResource SectionLabel}" />
+                            <ItemsControl ItemsSource="{x:Bind VM.SelectedPorts}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="core:OpenPort">
+                                        <Grid Margin="0,2" ColumnSpacing="10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Border Grid.Column="0" MinWidth="52" Height="22" CornerRadius="6" Background="{StaticResource RedGradient}" VerticalAlignment="Top">
+                                                <TextBlock Text="{x:Bind PortText}" FontSize="12" FontWeight="Bold" FontFamily="Consolas" Foreground="White" HorizontalAlignment="Center" />
+                                            </Border>
+                                            <StackPanel Grid.Column="1">
+                                                <TextBlock Text="{x:Bind Service}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                <TextBlock Text="{x:Bind Banner}" FontSize="10" FontFamily="Consolas" Foreground="{StaticResource DimBrush}" TextWrapping="Wrap"
+                                                           IsTextSelectionEnabled="True" Visibility="{x:Bind HasBanner, Converter={StaticResource BoolVis}}" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Bonjour-Dienste -->
+                    <Border Style="{StaticResource CardBorder}" Visibility="{x:Bind VM.HasServices, Mode=OneWay, Converter={StaticResource BoolVis}}">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="DIENSTE (BONJOUR)" Style="{StaticResource SectionLabel}" />
+                            <ItemsControl ItemsSource="{x:Bind VM.SelectedServices}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="core:BonjourService">
+                                        <StackPanel Margin="0,2">
+                                            <TextBlock Text="{x:Bind TypeLabel}" FontSize="12" FontWeight="SemiBold" />
+                                            <TextBlock Text="{x:Bind Name}" FontSize="10" Foreground="{StaticResource DimBrush}" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- Toast -->
+        <Border x:Name="ToastHost" Grid.ColumnSpan="4" VerticalAlignment="Bottom" HorizontalAlignment="Center"
+                Margin="0,0,0,24" CornerRadius="20" Padding="16,10" Background="{StaticResource RedGradient}" Visibility="Collapsed">
+            <TextBlock x:Name="ToastText" Foreground="White" FontWeight="SemiBold" FontSize="12.5" />
+        </Border>
+    </Grid>
+</UserControl>

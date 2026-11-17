@@ -3,3 +3,11 @@ build/
 *.zip
 .DS_Store
 .swiftpm/
+
+# .NET (Windows-Version)
+bin/
+obj/
+publish/
+artifacts/
+*.user
+.vs/

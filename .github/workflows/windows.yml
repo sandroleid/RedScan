@@ -1,0 +1,77 @@
+name: Windows
+
+on:
+  push:
+    branches: [main]
+    paths: ['windows/**', '.github/workflows/windows.yml']
+    tags: ['windows-v*']
+  pull_request:
+    paths: ['windows/**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    name: Test (Core-Logik auf echtem Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: .NET einrichten
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Wiederherstellen
+        run: dotnet restore windows/src/RedScan.Tests/RedScan.Tests.csproj
+      - name: Bauen
+        run: dotnet build windows/src/RedScan.Tests/RedScan.Tests.csproj -c Release --no-restore
+      - name: Tests ausführen
+        run: dotnet test windows/src/RedScan.Tests/RedScan.Tests.csproj -c Release --no-build --logger "console;verbosity=detailed"
+
+  app:
+    name: WinUI-App bauen
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: .NET einrichten
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: MSBuild (Visual Studio) einrichten
+        uses: microsoft/setup-msbuild@v2
+      - name: Wiederherstellen
+        run: msbuild windows/src/RedScan.App/RedScan.App.csproj /t:Restore /p:Configuration=Release /p:Platform=x64 /p:RuntimeIdentifier=win-x64 /p:SelfContained=true
+      - name: App veröffentlichen (unverpackt, self-contained)
+        run: msbuild windows/src/RedScan.App/RedScan.App.csproj /t:Publish /p:Configuration=Release /p:Platform=x64 /p:RuntimeIdentifier=win-x64 /p:SelfContained=true /p:WindowsAppSDKSelfContained=true /p:WindowsPackageType=None /p:PublishDir=${{ github.workspace }}\publish\
+      - name: Ausgabeordner packen
+        id: pack
+        shell: pwsh
+        run: |
+          $dir = "publish"
+          if (!(Test-Path "$dir/RedScan.exe")) { Write-Error "RedScan.exe nicht gefunden in $dir"; Get-ChildItem $dir -ErrorAction SilentlyContinue; exit 1 }
+          $zip = "RedScan-Windows.zip"
+          Compress-Archive -Path "$dir/*" -DestinationPath $zip -Force
+          "zip=$zip" >> $env:GITHUB_OUTPUT
+          Write-Host "Inhalt:"; Get-ChildItem $dir | Select-Object Name,Length | Format-Table
+      - name: Artefakt hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: RedScan-Windows
+          path: ${{ steps.pack.outputs.zip }}
+      - name: Release veröffentlichen (bei Tag)
+        if: startsWith(github.ref, 'refs/tags/windows-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.pack.outputs.zip }}
+          name: RedScan für Windows ${{ github.ref_name }}
+          body: |
+            Windows-Version von RedScan (C#/.NET, WinUI). Von GitHub Actions auf echtem Windows gebaut und getestet.
+
+            **Installation:** `RedScan-Windows.zip` herunterladen, entpacken, `RedScan.exe` starten.
+            Die App ist self-contained (kein .NET nötig). Beim ersten Start von SmartScreen ggf.
+            „Weitere Informationen → Trotzdem ausführen“ wählen.
+
+            Die macOS-Version findest du in den übrigen Releases (Tags `v*`).
+            Scanne nur Netzwerke, für die du eine Erlaubnis hast.

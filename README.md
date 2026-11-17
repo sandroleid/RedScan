@@ -87,8 +87,15 @@ Tools/                 Icon-Generator, Konverter für die Hersteller-DB
 Scanne nur Netzwerke, die dir gehören oder für die du ausdrücklich eine Erlaubnis hast.
 Port-Scans fremder Netze können verboten sein und gegen Nutzungsbedingungen (z. B. Schul- oder Firmennetz) verstoßen.
 
+## Windows-Version
+
+Es gibt auch eine Windows-Version (C#/.NET, WinUI) im Ordner [`windows/`](windows/).
+Sie wird über GitHub Actions auf echtem Windows gebaut und getestet; die fertige App liegt in den
+[Releases](https://github.com/sandroleid/RedScan/releases) unter einem Tag `windows-v…`.
+Details in der [windows/README.md](windows/README.md).
+
 ## Lizenz
 
 [GNU General Public License v3.0](LICENSE).
-Die Hersteller-Datenbank (`Resources/oui.txt`) wurde aus der [Wireshark](https://www.wireshark.org)-Datei `manuf` erzeugt
-(GPL-2.0-or-later), die auf den öffentlichen IEEE-Registern basiert.
+Die Hersteller-Datenbank (`Resources/oui.txt` bzw. `windows/src/RedScan.Core/Resources/oui.txt`) wurde aus der
+[Wireshark](https://www.wireshark.org)-Datei `manuf` erzeugt (GPL-2.0-or-later), die auf den öffentlichen IEEE-Registern basiert.
