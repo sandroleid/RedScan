@@ -18,13 +18,53 @@ enum Ping {
 enum ARP {
     struct Entry { let ip: String; let mac: String; let iface: String }
 
+    /// Liest die ARP-Tabelle. Zuerst direkt im eigenen Prozess (dort gilt RedScans
+    /// "Lokales Netzwerk"-Freigabe), danach als Rückfall über /usr/sbin/arp.
     static func table() -> [Entry] {
+        let direct = viaSysctl()
+        if !direct.isEmpty { return direct }
         let out = Shell.run("/usr/sbin/arp", ["-an"])
         return out.allMatches(#"\(([\d.]+)\) at ([0-9a-fA-F:]+) on (\w+)"#).compactMap { m in
             let mac = normalizeMAC(m[2])
             guard mac != "FF:FF:FF:FF:FF:FF", !mac.hasPrefix("01:00:5E") else { return nil }
             return Entry(ip: m[1], mac: mac, iface: m[3])
         }
+    }
+
+    /// Routing-Tabelle des Kernels (wie `arp -an` intern): rt_msghdr + sockaddr_inarp + sockaddr_dl.
+    static func viaSysctl() -> [Entry] {
+        var mib: [Int32] = [CTL_NET, PF_ROUTE, 0, AF_INET, NET_RT_FLAGS, RTF_LLINFO]
+        var len = 0
+        guard sysctl(&mib, 6, nil, &len, nil, 0) == 0, len > 0 else { return [] }
+        len += len / 4 // Puffer, falls die Tabelle zwischen den Aufrufen wächst
+        var buf = [UInt8](repeating: 0, count: len)
+        guard sysctl(&mib, 6, &buf, &len, nil, 0) == 0 else { return [] }
+        func roundup(_ a: Int) -> Int { a > 0 ? 1 + ((a - 1) | 3) : 4 }
+        var out: [Entry] = []
+        buf.withUnsafeBytes { raw in
+            var off = 0
+            while off + MemoryLayout<rt_msghdr>.size <= len {
+                let rtm = raw.loadUnaligned(fromByteOffset: off, as: rt_msghdr.self)
+                let msgLen = Int(rtm.rtm_msglen)
+                guard msgLen > 0, off + msgLen <= len else { break }
+                defer { off += msgLen }
+                let saOff = off + MemoryLayout<rt_msghdr>.size
+                guard saOff + MemoryLayout<sockaddr_in>.size <= off + msgLen else { continue }
+                let sin = raw.loadUnaligned(fromByteOffset: saOff, as: sockaddr_in.self)
+                let sdlOff = saOff + roundup(Int(sin.sin_len))
+                guard sdlOff + MemoryLayout<sockaddr_dl>.size <= off + msgLen + 12,
+                      let dataOff = MemoryLayout<sockaddr_dl>.offset(of: \sockaddr_dl.sdl_data) else { continue }
+                let sdl = raw.loadUnaligned(fromByteOffset: sdlOff, as: sockaddr_dl.self)
+                let m = sdlOff + dataOff + Int(sdl.sdl_nlen)
+                guard sdl.sdl_alen == 6, m + 6 <= off + msgLen else { continue }
+                let mac = (0..<6).map { String(format: "%02X", raw[m + $0]) }.joined(separator: ":")
+                guard mac != "FF:FF:FF:FF:FF:FF", !mac.hasPrefix("01:00:5E") else { continue }
+                var name = [CChar](repeating: 0, count: Int(IF_NAMESIZE))
+                if_indextoname(UInt32(sdl.sdl_index), &name)
+                out.append(Entry(ip: IPv4.string(sin.sin_addr), mac: mac, iface: String(cString: name)))
+            }
+        }
+        return out
     }
 }
 

@@ -20,7 +20,7 @@ Betriebssystem, offene Ports, Dienste, Webseiten und Zertifikate. Geschrieben in
 
 ## Installation
 
-1. `RedScan-1.0.0.zip` unter [Releases](../../releases) herunterladen und entpacken.
+1. `RedScan-1.0.1.zip` unter [Releases](../../releases/latest) herunterladen und entpacken.
 2. `RedScan.app` nach **Programme** ziehen.
 3. Die App ist nicht von Apple notarisiert. Beim ersten Start daher **Rechtsklick → Öffnen** oder im Terminal:
    ```sh
