@@ -10,6 +10,9 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <UseWinUI>true</UseWinUI>
     <WindowsPackageType>None</WindowsPackageType>
+    <!-- Ohne MSIX-Tooling erzeugt/veröffentlicht ein unverpacktes WinUI-Projekt seine eigene
+         RedScan.pri (inkl. kompiliertem XAML) nicht – die App beendet sich dann sofort beim Start. -->
+    <EnableMsixTooling>true</EnableMsixTooling>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <SelfContained>true</SelfContained>
     <Nullable>enable</Nullable>

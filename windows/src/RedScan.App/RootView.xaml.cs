@@ -12,10 +12,35 @@ public sealed partial class RootView : UserControl
 
     public RootView()
     {
+        App.Log("Oberfläche wird aufgebaut");
         VM = new MainViewModel();
         _dispatcher = DispatcherQueue.GetForCurrentThread();
         InitializeComponent();
         VM.Toast += ShowToast;
+        Loaded += OnLoaded;
+        App.Log("Oberfläche aufgebaut");
+    }
+
+    /// <summary>Kommandozeile: --autoscan startet sofort einen Scan, --dump &lt;Pfad&gt; speichert das Ergebnis als JSON.</summary>
+    private async void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        var args = Environment.GetCommandLineArgs();
+        if (!args.Contains("--autoscan")) return;
+        int t = Array.IndexOf(args, "--target");
+        if (t >= 0 && t + 1 < args.Length) VM.CustomTarget = args[t + 1];
+        App.Log($"Autoscan gestartet (Ziel: {VM.NetCidr})");
+        try
+        {
+            await VM.StartAsync();
+            App.Log($"Autoscan fertig: {VM.DeviceCount} Geräte, {VM.TotalOpenPorts} offene Ports");
+            int i = Array.IndexOf(args, "--dump");
+            if (i >= 0 && i + 1 < args.Length)
+            {
+                VM.DumpJson(args[i + 1]);
+                App.Log("Ergebnis gespeichert: " + args[i + 1]);
+            }
+        }
+        catch (Exception ex) { App.Log("Autoscan-Fehler: " + ex); }
     }
 
     private void OnShowDevices(object sender, RoutedEventArgs e) => VM.ShowHistory = false;

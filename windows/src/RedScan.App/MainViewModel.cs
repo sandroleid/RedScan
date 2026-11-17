@@ -180,6 +180,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
+    public void DumpJson(string path) =>
+        File.WriteAllText(path, JsonSerializer.Serialize(_scanner.SortedDevices, JsonOpts));
+
     private async void ExportJson(object? _)
     {
         var path = await FilePicker.SaveAsync("RedScan.json", "JSON", ".json");

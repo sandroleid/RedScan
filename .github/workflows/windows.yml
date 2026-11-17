@@ -51,10 +51,69 @@ jobs:
         run: |
           $dir = "publish"
           if (!(Test-Path "$dir/RedScan.exe")) { Write-Error "RedScan.exe nicht gefunden in $dir"; Get-ChildItem $dir -ErrorAction SilentlyContinue; exit 1 }
+          Write-Host "PRI-Dateien:"; Get-ChildItem $dir -Filter *.pri | Select-Object Name,Length | Format-Table
+          if (!(Test-Path "$dir/RedScan.pri") -and !(Test-Path "$dir/resources.pri")) {
+            Write-Error "Die App-Ressourcen (RedScan.pri/resources.pri) fehlen – die App würde nicht starten."; exit 1
+          }
           $zip = "RedScan-Windows.zip"
           Compress-Archive -Path "$dir/*" -DestinationPath $zip -Force
           "zip=$zip" >> $env:GITHUB_OUTPUT
-          Write-Host "Inhalt:"; Get-ChildItem $dir | Select-Object Name,Length | Format-Table
+      - name: Starttest (App starten, scannen, Screenshot)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force smoke | Out-Null
+          $start = Get-Date
+          $dump = Join-Path $PWD "smoke\scan.json"
+          # Nur das eigene /24 des Runners scannen (Cloud-Netze sind riesig)
+          $ip = (Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway } | Select-Object -First 1).IPv4Address.IPAddress
+          $target = ($ip -replace '\.\d+$', '.0') + '/24'
+          Write-Host "Runner-IP: $ip  ->  Ziel: $target"
+          $p = Start-Process -FilePath "publish\RedScan.exe" -ArgumentList "--autoscan","--target",$target,"--dump","`"$dump`"","--no-dialogs" -PassThru
+          $null = $p.Handle
+          $alive = $true
+          for ($i = 0; $i -lt 120; $i++) {
+            Start-Sleep -Seconds 2
+            if ($p.HasExited) { $alive = $false; break }
+            if ($i -eq 7) {
+              try {
+                Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+                $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+                $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+                [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+                $bmp.Save("smoke\screenshot-start.png"); Write-Host "Screenshot erstellt"
+              } catch { Write-Host "Screenshot nicht möglich: $_" }
+            }
+            if (Test-Path $dump) { break }
+          }
+          try {
+            Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+            $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+            $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+            [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+            $bmp.Save("smoke\screenshot-ende.png")
+          } catch { }
+          Write-Host "===== startup.log ====="
+          $log = Join-Path $env:LOCALAPPDATA "RedScan\startup.log"
+          if (Test-Path $log) { Copy-Item $log smoke\; Get-Content $log } else { Write-Host "(kein Log – App kam nicht bis zum Konstruktor)" }
+          Write-Host "===== Windows-Ereignisprotokoll (Fehler) ====="
+          Get-WinEvent -FilterHashtable @{ LogName = 'Application'; StartTime = $start } -ErrorAction SilentlyContinue |
+            Where-Object { $_.Level -le 2 } | Format-List TimeCreated, ProviderName, Id, Message | Out-String -Width 300 | Tee-Object smoke\events.txt
+          if (-not $alive) { Write-Error ("App hat sich beendet. ExitCode: 0x{0:X8}" -f $p.ExitCode); exit 1 }
+          if (-not (Test-Path $dump)) { Stop-Process $p -Force; Write-Error "Scan wurde nicht innerhalb von 4 Minuten fertig."; exit 1 }
+          $devices = Get-Content $dump -Raw | ConvertFrom-Json
+          Write-Host "===== Scan-Ergebnis: $($devices.Count) Geräte ====="
+          $devices | Select-Object Ip, Mac, Vendor, Kind, @{n='Ports';e={($_.OpenPorts | ForEach-Object Port) -join ' '}} | Format-Table -AutoSize | Out-String -Width 200
+          Start-Sleep -Seconds 2
+          if ($p.HasExited) { Write-Error "App ist nach dem Scan abgestürzt."; exit 1 }
+          Stop-Process $p -Force
+          Write-Host "Starttest bestanden: App läuft und hat gescannt."
+      - name: Starttest-Ergebnisse hochladen
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Starttest
+          path: smoke
+          if-no-files-found: ignore
       - name: Artefakt hochladen
         uses: actions/upload-artifact@v4
         with:
