@@ -55,6 +55,7 @@ jobs:
           if (!(Test-Path "$dir/RedScan.pri") -and !(Test-Path "$dir/resources.pri")) {
             Write-Error "Die App-Ressourcen (RedScan.pri/resources.pri) fehlen – die App würde nicht starten."; exit 1
           }
+          if (!(Test-Path "$dir/Assets/RedScan.ico")) { Write-Error "Icon-Datei Assets/RedScan.ico fehlt im Paket."; exit 1 }
           $zip = "RedScan-Windows.zip"
           Compress-Archive -Path "$dir/*" -DestinationPath $zip -Force
           "zip=$zip" >> $env:GITHUB_OUTPUT
@@ -63,6 +64,11 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force smoke | Out-Null
           $start = Get-Date
+          # Icon der EXE extrahieren (zeigt, ob das Programm-Icon eingebettet ist)
+          Add-Type -AssemblyName System.Drawing
+          $exeIcon = [System.Drawing.Icon]::ExtractAssociatedIcon((Resolve-Path "publish\RedScan.exe"))
+          $exeIcon.ToBitmap().Save("smoke\exe-icon.png")
+          Write-Host "EXE-Icon extrahiert ($($exeIcon.Width)x$($exeIcon.Height))"
           $dump = Join-Path $PWD "smoke\scan.json"
           # Nur das eigene /24 des Runners scannen (Cloud-Netze sind riesig)
           $ip = (Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway } | Select-Object -First 1).IPv4Address.IPAddress
@@ -108,6 +114,7 @@ jobs:
           $problems = Select-String -Path $log -Pattern "FEHLER|Unbeobachtete" -SimpleMatch:$false
           Write-Host "Loggröße: $logSize Bytes, Problemeinträge: $($problems.Count)"
           if ($problems.Count -gt 0) { $problems | Select-Object -First 5 | ForEach-Object { $_.Line }; Write-Error "Fehler im Startprotokoll."; exit 1 }
+          if (-not (Select-String -Path $log -Pattern "Fenster-Icon gesetzt" -Quiet)) { Write-Error "Fenster-Icon wurde nicht gesetzt."; exit 1 }
           Start-Sleep -Seconds 2
           if ($p.HasExited) { Write-Error "App ist nach dem Scan abgestürzt."; exit 1 }
           Stop-Process $p -Force

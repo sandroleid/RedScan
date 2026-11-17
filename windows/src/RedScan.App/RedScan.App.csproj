@@ -19,8 +19,18 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
     <AssemblyName>RedScan</AssemblyName>
-    <Version>1.0.1</Version>
+    <Version>1.0.2</Version>
+    <!-- Icon der .exe (Explorer, Verknüpfungen) -->
+    <ApplicationIcon>Assets\RedScan.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Wird zur Laufzeit für Fenster und Taskleiste geladen -->
+    <Content Include="Assets\RedScan.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.6.*" />
