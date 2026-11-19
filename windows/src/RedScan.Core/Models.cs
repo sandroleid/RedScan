@@ -1,3 +1,4 @@
+using System.ComponentModel;
 namespace RedScan.Core;
 
 public enum DeviceKind
@@ -96,8 +97,17 @@ public class HttpInfo
     public string? Certificate { get; set; }
 }
 
-public class Device
+/// <summary>
+/// Ein gefundenes Gerät. Die Instanz bleibt während eines Scans dieselbe; die Oberfläche wird über
+/// <see cref="NotifyChanged"/> informiert, statt die Karte neu aufzubauen (verhindert Flackern).
+/// </summary>
+public class Device : INotifyPropertyChanged
 {
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    /// <summary>Meldet der Oberfläche, dass sich Werte geändert haben (leerer Name = alle Eigenschaften).</summary>
+    public void NotifyChanged() => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(string.Empty));
+
     public string Ip { get; set; } = "";
     public string? Mac { get; set; }
     public string? Vendor { get; set; }

@@ -193,32 +193,36 @@
                                 <StackPanel Spacing="10">
                                     <Grid>
                                         <Border Width="42" Height="42" CornerRadius="12" Background="{StaticResource RedGradient}" HorizontalAlignment="Left">
-                                            <FontIcon Glyph="{x:Bind Kind, Converter={StaticResource KindGlyph}}" FontFamily="Segoe Fluent Icons" Foreground="White" FontSize="19" />
+                                            <FontIcon Glyph="{x:Bind Kind, Mode=OneWay, Converter={StaticResource KindGlyph}}" FontFamily="Segoe Fluent Icons" Foreground="White" FontSize="19" />
                                         </Border>
                                         <Border HorizontalAlignment="Right" VerticalAlignment="Top" CornerRadius="8" Padding="7,3"
                                                 Background="{StaticResource RedGradient}"
-                                                Visibility="{x:Bind IsGateway, Converter={StaticResource BoolVis}}">
+                                                Visibility="{x:Bind IsGateway, Mode=OneWay, Converter={StaticResource BoolVis}}">
                                             <TextBlock Text="Gateway" FontSize="10" FontWeight="SemiBold" Foreground="White" />
                                         </Border>
                                     </Grid>
                                     <StackPanel Spacing="2">
-                                        <TextBlock Text="{x:Bind DisplayName}" FontSize="14" FontWeight="Bold" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{x:Bind DisplayName, Mode=OneWay}" FontSize="14" FontWeight="Bold" TextTrimming="CharacterEllipsis" />
                                         <TextBlock Text="{x:Bind Ip}" FontSize="12" FontFamily="Consolas" Foreground="{StaticResource RedBrightBrush}" />
-                                        <TextBlock Text="{x:Bind VendorDisplay}" FontSize="11" Foreground="{StaticResource DimBrush}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{x:Bind VendorDisplay, Mode=OneWay}" FontSize="11" Foreground="{StaticResource DimBrush}" TextTrimming="CharacterEllipsis" />
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" Spacing="6">
                                         <Border CornerRadius="10" Padding="7,3" Background="#24E82230">
-                                            <TextBlock Text="{x:Bind Kind, Converter={StaticResource KindLabel}}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource RedBrightBrush}" />
+                                            <TextBlock Text="{x:Bind Kind, Mode=OneWay, Converter={StaticResource KindLabel}}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource RedBrightBrush}" />
                                         </Border>
                                         <Border CornerRadius="10" Padding="7,3" Background="#24E82230">
-                                            <TextBlock Text="{x:Bind PortCountText}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource RedBrightBrush}" />
+                                            <TextBlock Text="{x:Bind PortCountText, Mode=OneWay}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource RedBrightBrush}" />
                                         </Border>
-                                        <TextBlock Text="{x:Bind LatencyText}" FontSize="10" FontFamily="Consolas" Foreground="{StaticResource FaintBrush}" VerticalAlignment="Center" />
+                                        <TextBlock Text="{x:Bind LatencyText, Mode=OneWay}" FontSize="10" FontFamily="Consolas" Foreground="{StaticResource FaintBrush}" VerticalAlignment="Center" />
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
                         </DataTemplate>
                     </GridView.ItemTemplate>
+                    <!-- Keine Ein-/Umsortier-Animationen: Karten sollen während des Scans ruhig stehen bleiben -->
+                    <GridView.ItemContainerTransitions>
+                        <TransitionCollection />
+                    </GridView.ItemContainerTransitions>
                     <GridView.ItemContainerStyle>
                         <Style TargetType="GridViewItem">
                             <Setter Property="Padding" Value="0" />

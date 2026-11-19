@@ -283,3 +283,26 @@ public class HistoryTests
         finally { if (File.Exists(tmp)) File.Delete(tmp); }
     }
 }
+
+public class DeviceNotifyTests
+{
+    [Fact]
+    public void NotifyChanged_RaisesForAllProperties()
+    {
+        var d = new Device { Ip = "10.0.0.5" };
+        string? got = null;
+        d.PropertyChanged += (_, e) => got = e.PropertyName;
+        d.NotifyChanged();
+        Assert.Equal(string.Empty, got);
+    }
+
+    [Fact]
+    public void JsonExport_IgnoresEvent()
+    {
+        var d = new Device { Ip = "10.0.0.5" };
+        d.PropertyChanged += (_, _) => { };
+        var json = System.Text.Json.JsonSerializer.Serialize(d);
+        Assert.Contains("10.0.0.5", json);
+        Assert.DoesNotContain("PropertyChanged", json);
+    }
+}

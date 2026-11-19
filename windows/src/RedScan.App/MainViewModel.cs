@@ -101,14 +101,18 @@ public sealed class MainViewModel : INotifyPropertyChanged
         var snapshot = _scanner.SortedDevices;
         var filtered = ApplyFilter(snapshot);
 
-        // Devices-Collection an die gefilterte Liste angleichen (einfaches Neuaufbauen)
-        Devices.Clear();
-        foreach (var d in filtered) Devices.Add(d);
+        // Devices-Collection nur abgleichen statt neu aufbauen: Ein Clear() + Neu-Einfügen alle 350 ms
+        // ließ sämtliche Karten während des Scans flackern.
+        SyncDevices(filtered);
 
         if (SelectedDevice != null)
         {
             var still = snapshot.FirstOrDefault(d => d.Ip == SelectedDevice.Ip);
-            if (still != null) { SelectedDevice = still; RebuildSelectedDetails(); }
+            if (still != null)
+            {
+                if (!ReferenceEquals(still, SelectedDevice)) SelectedDevice = still;
+                else if (DetailState(still) != _detailState) RebuildSelectedDetails();
+            }
         }
 
         Phase = _scanner.Phase;
@@ -119,6 +123,51 @@ public sealed class MainViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(ArpBlocked));
         OnPropertyChanged(nameof(Subtitle));
     }
+
+    // Zuletzt angezeigter Zustand je Karte bzw. der Detailansicht – nur bei Änderung wird neu gezeichnet.
+    private readonly Dictionary<Device, string> _cardState = new(ReferenceEqualityComparer.Instance);
+    private string _detailState = "";
+
+    private void SyncDevices(IReadOnlyList<Device> target)
+    {
+        var wanted = new HashSet<Device>(target, ReferenceEqualityComparer.Instance);
+        for (int i = Devices.Count - 1; i >= 0; i--)
+            if (!wanted.Contains(Devices[i])) Devices.RemoveAt(i);
+
+        for (int i = 0; i < target.Count; i++)
+        {
+            var d = target[i];
+            if (i < Devices.Count && ReferenceEquals(Devices[i], d)) continue;
+            int at = -1;
+            for (int j = i + 1; j < Devices.Count; j++)
+                if (ReferenceEquals(Devices[j], d)) { at = j; break; }
+            if (at >= 0) Devices.Move(at, i); else Devices.Insert(i, d);
+        }
+
+        foreach (var stale in _cardState.Keys.Where(k => !wanted.Contains(k)).ToList()) _cardState.Remove(stale);
+        foreach (var d in target)
+        {
+            var state = CardState(d);
+            if (_cardState.TryGetValue(d, out var old))
+            {
+                if (old == state) continue;
+                _cardState[d] = state;
+                d.NotifyChanged();   // nur diese eine Karte aktualisiert ihre Texte
+            }
+            else _cardState[d] = state;
+        }
+    }
+
+    private static string CardState(Device d) =>
+        string.Join("|", d.Kind, d.IsGateway, d.DisplayName, d.VendorDisplay, d.PortCountText, d.LatencyText,
+            d.Mac, d.Vendor, d.Hostname, d.MdnsName, d.NetbiosName);
+
+    private static string DetailState(Device d) =>
+        string.Join("|", CardState(d), d.OsGuess, d.DeepScanned,
+            string.Join(",", d.OpenPorts.Select(p => $"{p.Port}:{p.Service}:{p.Banner}")),
+            string.Join(",", d.Services.Select(s => $"{s.Name}:{s.Type}")),
+            string.Join(",", d.Http.Select(h => $"{h.Server}:{h.Title}")),
+            string.Join(",", d.Upnp.Select(u => u.FriendlyName)));
 
     private IReadOnlyList<Device> ApplyFilter(IReadOnlyList<Device> list)
     {
@@ -135,6 +184,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         SelectedServices.Clear();
         SelectedHttp.Clear();
         SelectedUpnp.Clear();
+        _detailState = SelectedDevice is { } sel ? DetailState(sel) : "";
         if (SelectedDevice is not { } d) return;
         foreach (var p in d.OpenPorts) SelectedPorts.Add(p);
         foreach (var s in d.Services) SelectedServices.Add(s);
@@ -156,6 +206,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         Scans.Clear();
         foreach (var s in _history.Scans) Scans.Add(s);
         OnPropertyChanged(nameof(HistoryCountText));
+        OnPropertyChanged(nameof(SelectedHistoryText));
     }
 
     // MARK: Wake-on-LAN
