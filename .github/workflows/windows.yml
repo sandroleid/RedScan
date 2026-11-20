@@ -115,6 +115,7 @@ jobs:
           Write-Host "Loggröße: $logSize Bytes, Problemeinträge: $($problems.Count)"
           if ($problems.Count -gt 0) { $problems | Select-Object -First 5 | ForEach-Object { $_.Line }; Write-Error "Fehler im Startprotokoll."; exit 1 }
           if (-not (Select-String -Path $log -Pattern "Fenster-Icon gesetzt" -Quiet)) { Write-Error "Fenster-Icon wurde nicht gesetzt."; exit 1 }
+          if (-not (Select-String -Path $log -Pattern "Titelleiste angepasst" -Quiet)) { Write-Error "Dunkle Titelleiste wurde nicht gesetzt."; exit 1 }
           Start-Sleep -Seconds 2
           if ($p.HasExited) { Write-Error "App ist nach dem Scan abgestürzt."; exit 1 }
           Stop-Process $p -Force

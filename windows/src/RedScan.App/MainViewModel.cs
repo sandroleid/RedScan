@@ -290,6 +290,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public double Progress { get => _progress; private set { _progress = value; OnPropertyChanged(); } }
 
     public bool IsScanning => _scanner.IsScanning;
+    /// <summary>IPs aller gefundenen Geräte (ohne eigenes Gerät) für das Radar – unabhängig vom Suchfilter.</summary>
+    public IReadOnlyList<string> RadarBlips => _scanner.SortedDevices.Select(d => d.Ip).Where(ip => ip != _scanner.Network?.Ip).ToList();
     public string ScanButtonText => _scanner.IsScanning ? "Scan abbrechen" : "Netzwerk scannen";
     public int DeviceCount => _scanner.DeviceCount;
     public int TotalOpenPorts => _scanner.TotalOpenPorts;

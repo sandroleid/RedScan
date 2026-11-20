@@ -55,6 +55,9 @@
                     </Button>
                 </Grid>
 
+                <!-- Radar -->
+                <local:RadarView x:Name="Radar" Height="190" Margin="8,0" />
+
                 <!-- Scan-Steuerung -->
                 <Button Style="{StaticResource RedButton}" Command="{x:Bind VM.ScanCommand}"
                         Content="{x:Bind VM.ScanButtonText, Mode=OneWay}" />

@@ -18,6 +18,12 @@ public sealed partial class RootView : UserControl
         InitializeComponent();
         VM.Toast += ShowToast;
         Loaded += OnLoaded;
+        VM.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(MainViewModel.IsScanning) or nameof(MainViewModel.DeviceCount))
+                UpdateRadar();
+        };
+        Loaded += (_, _) => UpdateRadar();
         App.Log("Oberfläche aufgebaut");
     }
 
@@ -41,6 +47,12 @@ public sealed partial class RootView : UserControl
             }
         }
         catch (Exception ex) { App.Log("Autoscan-Fehler: " + ex); }
+    }
+
+    private void UpdateRadar()
+    {
+        if (_dispatcher.HasThreadAccess) Radar.Update(VM.IsScanning, VM.RadarBlips);
+        else _dispatcher.TryEnqueue(() => Radar.Update(VM.IsScanning, VM.RadarBlips));
     }
 
     private void OnShowDevices(object sender, RoutedEventArgs e) => VM.ShowHistory = false;
