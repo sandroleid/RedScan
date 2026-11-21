@@ -85,6 +85,11 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 ; Nutzerdaten (Verlauf, Einstellungen) liegen in %LOCALAPPDATA%\RedScan und bleiben erhalten.
 Type: filesandordirs; Name: "{app}\*"; Check: IsDedicatedAppDir
 
+[UninstallDelete]
+; Durch [InstallDelete] wird bei einem Update auch unins000.dat neu angelegt; darin fehlt dann,
+; dass der Programmordner selbst von der Erstinstallation stammt. Leeren Ordner daher explizit entfernen.
+Type: dirifempty; Name: "{app}"
+
 [Files]
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
