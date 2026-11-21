@@ -4,23 +4,30 @@ struct SidebarView: View {
     @EnvironmentObject var scanner: NetScanner
     @EnvironmentObject var history: HistoryStore
     @EnvironmentObject var nav: SelectionState
+    @EnvironmentObject var appearance: AppearanceStore
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                header
-                tabs
-                RadarView(active: scanner.isScanning, blips: scanner.devices.keys.filter { $0 != scanner.network?.ip })
-                    .frame(height: 190)
-                    .padding(.horizontal, 8)
-                scanControls
-                if scanner.arpBlocked { permissionHint }
-                networkCard
-                statsCard
-                Spacer(minLength: 0)
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    header
+                    tabs
+                    RadarView(active: scanner.isScanning, blips: scanner.devices.keys.filter { $0 != scanner.network?.ip })
+                        .frame(height: 190)
+                        .padding(.horizontal, 8)
+                    scanControls
+                    if scanner.arpBlocked { permissionHint }
+                    networkCard
+                    statsCard
+                    appearanceCard.id("appearance")
+                    Spacer(minLength: 0)
+                }
+                .padding(18)
+                .padding(.top, 18)
             }
-            .padding(18)
-            .padding(.top, 18)
+            .onReceive(NotificationCenter.default.publisher(for: .redScanScrollSidebarToEnd)) { _ in
+                proxy.scrollTo("appearance", anchor: .bottom)
+            }
         }
         .background(
             ZStack {
@@ -37,7 +44,7 @@ struct SidebarView: View {
                 Image(systemName: "dot.radiowaves.left.and.right").font(.system(size: 16, weight: .bold)).foregroundStyle(.white)
             }
             .frame(width: 34, height: 34)
-            .shadow(color: Theme.red.opacity(0.6), radius: 8)
+            .shadow(color: Theme.shadow(0.6), radius: 8)
             VStack(alignment: .leading, spacing: 1) {
                 Text("RedScan").font(.system(size: 19, weight: .heavy, design: .rounded))
                 Text("Netzwerk-Scanner").font(.system(size: 11)).foregroundStyle(Theme.dim)
@@ -51,8 +58,45 @@ struct SidebarView: View {
             tabButton(.history, "Verlauf", "clock.arrow.circlepath", badge: history.newInLastScan.count, highlight: !history.newInLastScan.isEmpty)
         }
         .padding(4)
-        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.black.opacity(0.3)))
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.inset))
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Theme.stroke))
+    }
+
+    /// Segment-Button im Stil der Tabs (aktiv = roter Verlauf mit weißer Schrift).
+    private func segmentLabel(_ title: String, _ icon: String, active: Bool) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon).font(.system(size: 11))
+            Text(title).font(.system(size: 12, weight: .semibold))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 7)
+        .foregroundStyle(active ? Color.white : Theme.dim)
+        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(active ? AnyShapeStyle(Theme.gradient) : AnyShapeStyle(Color.clear)))
+        .contentShape(Rectangle())
+    }
+
+    private func appearanceButton(_ mode: Appearance, _ title: String, _ icon: String) -> some View {
+        Button { withAnimation(.snappy) { appearance.select(mode) } } label: {
+            segmentLabel(title, icon, active: appearance.mode == mode)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var appearanceCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("DARSTELLUNG").font(.system(size: 10, weight: .bold)).tracking(1.2).foregroundStyle(Theme.redBright)
+            HStack(spacing: 6) {
+                appearanceButton(.dark, "Dunkel", "moon.fill")
+                appearanceButton(.light, "Hell", "sun.max.fill")
+            }
+            .padding(4)
+            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.inset))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Theme.stroke))
+        }
+        .padding(14)
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Theme.card))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Theme.stroke))
+        .help("Darstellung der App: hell oder dunkel")
     }
 
     private func tabButton(_ tab: SelectionState.Tab, _ title: String, _ icon: String, badge: Int, highlight: Bool = false) -> some View {
@@ -64,13 +108,13 @@ struct SidebarView: View {
                 if badge > 0 {
                     Text("\(badge)").font(.system(size: 10, weight: .bold))
                         .padding(.horizontal, 5).padding(.vertical, 1)
-                        .background(Capsule().fill(highlight ? Color.white.opacity(active ? 0.3 : 0) : Color.black.opacity(0.25)))
+                        .background(Capsule().fill(highlight ? Color.white.opacity(active ? 0.3 : 0) : (active ? Color.black.opacity(0.25) : Theme.insetSoft)))
                         .background(Capsule().fill(highlight && !active ? Theme.red : .clear))
                 }
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 7)
-            .foregroundStyle(active ? .white : Theme.dim)
+            .foregroundStyle(active ? Color.white : Theme.dim)
             .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(active ? AnyShapeStyle(Theme.gradient) : AnyShapeStyle(Color.clear)))
             .contentShape(Rectangle())
         }
@@ -113,7 +157,7 @@ struct SidebarView: View {
                     .onSubmit { scanner.refreshNetwork() }
             }
             .padding(8)
-            .background(RoundedRectangle(cornerRadius: 8).fill(Color.black.opacity(0.3)))
+            .background(RoundedRectangle(cornerRadius: 8).fill(Theme.inset))
             .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.stroke))
             .help("Optional: eigenes Ziel als CIDR, z. B. 192.168.0.0/23. Leer = automatisch.")
         }
@@ -168,7 +212,7 @@ struct SidebarView: View {
                 .buttonStyle(RedButtonStyle(prominent: false))
         }
         .padding(12)
-        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.red.opacity(0.12)))
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.tint(0.12)))
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Theme.red.opacity(0.45)))
     }
 

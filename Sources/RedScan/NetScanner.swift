@@ -46,7 +46,10 @@ final class NetScanner: ObservableObject {
 
     init(history: HistoryStore) {
         self.history = history
-        network = NetworkDetector.detect()
+        // `--target <cidr>`: eigenes Ziel vorgeben (z. B. für schnelle Tests in CI)
+        let args = CommandLine.arguments
+        if let i = args.firstIndex(of: "--target"), i + 1 < args.count { customTarget = args[i + 1] }
+        network = NetworkDetector.detect(customCIDR: customTarget)
     }
 
     // MARK: - Wake-on-LAN

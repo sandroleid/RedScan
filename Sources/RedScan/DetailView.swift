@@ -77,7 +77,7 @@ struct DetailView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(LinearGradient(colors: [Theme.red.opacity(0.35), Theme.card], startPoint: .topLeading, endPoint: .bottomTrailing))
+                .fill(LinearGradient(colors: [Theme.headerTint, Theme.card], startPoint: .topLeading, endPoint: .bottomTrailing))
         )
         .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(Theme.red.opacity(0.3)))
     }
@@ -131,7 +131,7 @@ struct DetailView: View {
                     HStack(alignment: .top, spacing: 10) {
                         Text("\(p.port)")
                             .font(.system(size: 12, weight: .bold, design: .monospaced))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.white)
                             .frame(width: 52, height: 22)
                             .background(RoundedRectangle(cornerRadius: 6).fill(Theme.gradient))
                         VStack(alignment: .leading, spacing: 2) {
@@ -165,7 +165,7 @@ struct DetailView: View {
                     subrow("Weiterleitung", h.finalURL)
                 }
                 .padding(10)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.25)))
+                .background(RoundedRectangle(cornerRadius: 10).fill(Theme.insetSoft))
             }
         }
     }
@@ -206,7 +206,7 @@ struct DetailView: View {
                     subrow("XML", u.location)
                 }
                 .padding(10)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.25)))
+                .background(RoundedRectangle(cornerRadius: 10).fill(Theme.insetSoft))
             }
         }
     }

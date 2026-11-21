@@ -131,7 +131,7 @@ struct DevicesView: View {
                 Text("\(count)").font(.system(size: 10.5, weight: .bold)).opacity(0.75)
             }
             .padding(.horizontal, 10).padding(.vertical, 6)
-            .foregroundStyle(active ? .white : Theme.dim)
+            .foregroundStyle(active ? Color.white : Theme.dim)
             .background(Capsule().fill(active ? AnyShapeStyle(Theme.gradient) : AnyShapeStyle(Theme.card)))
             .overlay(Capsule().stroke(active ? Color.clear : Theme.stroke))
         }
@@ -208,7 +208,7 @@ struct DeviceCard: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(selected ? AnyShapeStyle(Theme.gradient) : AnyShapeStyle(Theme.stroke), lineWidth: selected ? 1.6 : 1)
         )
-        .shadow(color: selected ? Theme.red.opacity(0.35) : .clear, radius: 14, y: 4)
+        .shadow(color: selected ? Theme.shadow(0.35) : .clear, radius: 14, y: 4)
         .contentShape(Rectangle())
         .onHover { hoverState.on = $0 }
         .transition(.scale(scale: 0.9).combined(with: .opacity))
