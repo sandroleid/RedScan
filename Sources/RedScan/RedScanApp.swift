@@ -61,6 +61,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         raiseFileLimit()
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
+        if Snapshot.path != nil {
+            print("Gestartet, Darstellung \(Appearance.effectiveAtLaunch.rawValue), Fenster: \(NSApp.windows.count)")
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 10_000_000_000)
+                for w in NSApp.windows {
+                    print("Fenster: \(type(of: w)) sichtbar=\(w.isVisible) frame=\(w.frame) titel=\(w.title)")
+                }
+            }
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }

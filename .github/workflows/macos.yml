@@ -56,8 +56,11 @@ jobs:
           run_app() {
             name=$1; shift
             rm -f "smoke/snapshot-$name.png"
-            "$BIN" "$@" --snapshot "$PWD/smoke/snapshot-$name.png" > "smoke/app-$name.log" 2>&1 &
-            pid=$!
+            # Über LaunchServices starten (wie per Doppelklick), damit das Fenster erscheint
+            open -n "$APP" --stdout "$PWD/smoke/app-$name.log" --stderr "$PWD/smoke/app-$name.log" --args "$@" --snapshot "$PWD/smoke/snapshot-$name.png"
+            sleep 3
+            pid=$(pgrep -n -f "$BIN" || true)
+            [[ -n "$pid" ]] || { echo "::error::App ($name) läuft nicht"; cat "smoke/app-$name.log"; return 1; }
             for i in $(seq 1 150); do
               sleep 2
               if ! kill -0 $pid 2>/dev/null; then echo "::error::App ($name) hat sich beendet"; cat "smoke/app-$name.log"; return 1; fi
@@ -66,7 +69,8 @@ jobs:
             sleep 1
             screencapture -x "smoke/screenshot-$name.png" || echo "::warning::screencapture ($name) fehlgeschlagen"
             [[ -f "smoke/snapshot-$name.png" ]] || echo "::warning::Kein In-App-Snapshot ($name) innerhalb von 5 Minuten"
-            kill $pid 2>/dev/null; wait $pid 2>/dev/null || true
+            kill $pid 2>/dev/null || true
+            for i in 1 2 3 4 5; do kill -0 $pid 2>/dev/null || break; sleep 1; done
             echo "===== App-Log ($name) ====="; cat "smoke/app-$name.log"
           }
 
