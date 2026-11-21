@@ -52,26 +52,43 @@ jobs:
           system_profiler SPDisplaysDataType | grep -i resolution || true
           fail=0
 
+          # Dock ausblenden, damit es das Fenster nicht verdeckt
+          defaults write com.apple.dock autohide -bool true; killall Dock || true; sleep 2
+
+          # Wartet auf eine Marke im App-Log und fotografiert dann nur das App-Fenster
+          shot() { # $1 = Marke, $2 = Datei
+            for i in $(seq 1 120); do
+              grep -q "$1" "$log" 2>/dev/null && break
+              if ! kill -0 $pid 2>/dev/null; then echo "::error::App ($name) hat sich beendet"; return 1; fi
+              # Hängt die App? Stack des Hauptthreads sichern
+              [[ $i == 30 ]] && sample $pid 2 -file "$PWD/smoke/sample-$name.txt" >/dev/null 2>&1 || true
+              sleep 2
+            done
+            wid=$(grep -o 'Fenster-ID [0-9]*' "$log" | tail -1 | awk '{print $2}')
+            if grep -q "$1" "$log" && [[ -n "$wid" && "$wid" != 0 ]]; then
+              screencapture -x -o -l"$wid" "$2"
+            else
+              echo "::warning::Marke $1 ($name) nicht erreicht – Bildschirmfoto als Ersatz"
+              screencapture -x "$2"; return 1
+            fi
+          }
+
           # $1 = Name, restliche Argumente gehen an die App
           run_app() {
             name=$1; shift
-            rm -f "smoke/snapshot-$name.png"
+            log="$PWD/smoke/app-$name.log"; rm -f "$log"
             # Über LaunchServices starten (wie per Doppelklick), damit das Fenster erscheint
-            open -n "$APP" --stdout "$PWD/smoke/app-$name.log" --stderr "$PWD/smoke/app-$name.log" --args "$@" --snapshot "$PWD/smoke/snapshot-$name.png"
+            open -n "$APP" --stdout "$log" --stderr "$log" --args "$@" --ci-capture
             sleep 3
             pid=$(pgrep -n -f "$BIN" || true)
-            [[ -n "$pid" ]] || { echo "::error::App ($name) läuft nicht"; cat "smoke/app-$name.log"; return 1; }
-            for i in $(seq 1 150); do
-              sleep 2
-              if ! kill -0 $pid 2>/dev/null; then echo "::error::App ($name) hat sich beendet"; cat "smoke/app-$name.log"; return 1; fi
-              [[ -f "smoke/snapshot-$name.png" ]] && break
-            done
-            sleep 1
-            screencapture -x "smoke/screenshot-$name.png" || echo "::warning::screencapture ($name) fehlgeschlagen"
-            [[ -f "smoke/snapshot-$name.png" ]] || echo "::warning::Kein In-App-Snapshot ($name) innerhalb von 5 Minuten"
+            [[ -n "$pid" ]] || { echo "::error::App ($name) läuft nicht"; cat "$log"; return 1; }
+            rc=0
+            shot BEREIT-OBEN "smoke/screenshot-$name.png" || rc=1
+            [[ $rc == 0 ]] && { shot BEREIT-UNTEN "smoke/screenshot-$name-unten.png" || rc=1; }
             kill $pid 2>/dev/null || true
             for i in 1 2 3 4 5; do kill -0 $pid 2>/dev/null || break; sleep 1; done
-            echo "===== App-Log ($name) ====="; cat "smoke/app-$name.log"
+            echo "===== App-Log ($name) ====="; cat "$log"
+            return $rc
           }
 
           for theme in dark light; do
@@ -94,9 +111,6 @@ jobs:
           [[ "$stored" == "light" ]] || { echo "::error::Umschalten wurde nicht gespeichert"; fail=1; }
           grep -q "Darstellung live umgeschaltet: light" smoke/app-switched.log || { echo "::error::Live-Umschalten nicht im Log"; fail=1; }
 
-          for name in dark light; do
-            [[ -f "smoke/snapshot-$name.png" || -f "smoke/screenshot-$name.png" ]] || { echo "::error::Kein Bild für $name"; fail=1; }
-          done
           exit $fail
 
       - name: Speicherung der Darstellung prüfen

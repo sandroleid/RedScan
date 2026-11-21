@@ -61,7 +61,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         raiseFileLimit()
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
-        if Snapshot.path != nil {
+        if CICapture.enabled {
             print("Gestartet, Darstellung \(Appearance.effectiveAtLaunch.rawValue), Fenster: \(NSApp.windows.count)")
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 10_000_000_000)
@@ -115,71 +115,57 @@ struct ContentView: View {
         .onAppear {
             if CommandLine.arguments.contains("--autoscan") {
                 scanner.start()
-            } else if Snapshot.path != nil {
-                Task { @MainActor in try? await Task.sleep(nanoseconds: 2_000_000_000); Snapshot.capture(scanner: scanner, selection: sel, appearance: appearance) }
+            } else if CICapture.enabled {
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    CICapture.run(scanner: scanner, selection: sel, appearance: appearance)
+                }
             }
         }
         .onChange(of: scanner.isScanning) { _, scanning in
             if scanning, let s = sel.ip, scanner.devices[s] == nil { sel.ip = nil }
-            if !scanning, scanner.lastScan != nil { Snapshot.capture(scanner: scanner, selection: sel, appearance: appearance) }
+            if !scanning, scanner.lastScan != nil { CICapture.run(scanner: scanner, selection: sel, appearance: appearance) }
         }
     }
 }
 
-/// Für CI: `--snapshot <png>` speichert nach dem Scan ein Bild des Hauptfensters (ohne Bildschirmaufnahme-Recht).
+/// Für CI: `--ci-capture` bereitet nach dem Scan das Fenster für Screenshots vor und meldet im Log,
+/// wann `screencapture -l <Fenster-ID>` ein Bild machen kann (oben, dann Seitenleiste ans Ende gescrollt).
 @MainActor
-enum Snapshot {
-    static var path: String? {
-        let args = CommandLine.arguments
-        guard let i = args.firstIndex(of: "--snapshot"), i + 1 < args.count else { return nil }
-        return args[i + 1]
-    }
+enum CICapture {
+    static var enabled: Bool { CommandLine.arguments.contains("--ci-capture") }
     private static var done = false
 
-    /// `--switch-appearance light|dark`: vor dem Bild live umschalten (wie ein Klick im Umschalter, wird gespeichert).
+    /// `--switch-appearance light|dark`: vorher live umschalten (wie ein Klick im Umschalter, wird gespeichert).
     static var switchTo: Appearance? {
         let args = CommandLine.arguments
         guard let i = args.firstIndex(of: "--switch-appearance"), i + 1 < args.count else { return nil }
         return Appearance(rawValue: args[i + 1].lowercased())
     }
 
-    static func capture(scanner: NetScanner, selection: SelectionState, appearance: AppearanceStore) {
-        guard let path, !done else { return }
+    static func run(scanner: NetScanner, selection: SelectionState, appearance: AppearanceStore) {
+        guard enabled, !done else { return }
         done = true
         if let m = switchTo {
             appearance.select(m)
             print("Darstellung live umgeschaltet: \(m.rawValue)")
         }
-        // Detailansicht mit zeigen (Gateway bzw. erstes Gerät), Fenster groß machen, Seitenleiste ans Ende scrollen
+        // Detailansicht mit zeigen (Gateway bzw. erstes Gerät) und Fenster so groß wie möglich
         if selection.ip == nil {
             selection.ip = scanner.sortedDevices.first(where: \.isGateway)?.ip ?? scanner.sortedDevices.first?.ip
         }
-        if let win = mainWindow, let screen = win.screen ?? NSScreen.main {
+        let win = NSApp.windows.first { $0.isVisible && $0.contentView != nil && !($0 is NSPanel) }
+        if let win, let screen = win.screen ?? NSScreen.main {
             win.setFrame(screen.visibleFrame, display: true)
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            print("Fenster-ID \(win?.windowNumber ?? 0) Größe \(win.map { "\(Int($0.frame.width))x\(Int($0.frame.height))" } ?? "-") Darstellung \(win?.effectiveAppearance.name.rawValue ?? "-")")
+            print("BEREIT-OBEN")
+            try? await Task.sleep(nanoseconds: 6_000_000_000)
             NotificationCenter.default.post(name: .redScanScrollSidebarToEnd, object: nil)
-        }
-        Task { @MainActor in try? await Task.sleep(nanoseconds: 3_000_000_000); write(to: path) }
-    }
-
-    private static var mainWindow: NSWindow? {
-        NSApp.windows.first { $0.isVisible && $0.contentView != nil && !($0 is NSPanel) }
-    }
-
-    static func write(to path: String) {
-        guard let win = mainWindow, let view = win.contentView?.superview ?? win.contentView else {
-            print("Snapshot: kein Fenster gefunden"); return
-        }
-        let rect = view.bounds
-        guard let rep = view.bitmapImageRepForCachingDisplay(in: rect) else { print("Snapshot: kein Bitmap"); return }
-        view.cacheDisplay(in: rect, to: rep)
-        guard let data = rep.representation(using: .png, properties: [:]) else { print("Snapshot: PNG fehlgeschlagen"); return }
-        do {
-            try data.write(to: URL(fileURLWithPath: path))
-            print("Snapshot gespeichert: \(path) (\(Int(rect.width))x\(Int(rect.height)), Darstellung \(win.effectiveAppearance.name.rawValue))")
-        } catch {
-            print("Snapshot: \(error)")
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            print("BEREIT-UNTEN")
         }
     }
 }
