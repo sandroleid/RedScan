@@ -113,6 +113,7 @@ struct ContentView: View {
         }
         .animation(.snappy, value: scanner.toast)
         .onAppear {
+            if CICapture.enabled { print("Hauptansicht erschienen") }
             if CommandLine.arguments.contains("--autoscan") {
                 scanner.start()
             } else if CICapture.enabled {

@@ -88,8 +88,12 @@ jobs:
             kill $pid 2>/dev/null || true
             for i in 1 2 3 4 5; do kill -0 $pid 2>/dev/null || break; sleep 1; done
             echo "===== App-Log ($name) ====="; cat "$log"
+            log show --last 6m --style compact --predicate 'process == "RedScan"' 2>/dev/null | tail -150 > "smoke/syslog-$name.txt" || true
             return $rc
           }
+
+          # Probestart ohne Scan (zeigt, ob das Fenster grundsätzlich erscheint)
+          run_app probe --theme dark || true
 
           for theme in dark light; do
             dump="$PWD/smoke/scan-$theme.json"
