@@ -44,10 +44,18 @@ Voraussetzung: macOS 14 (Sonoma) oder neuer, Apple Silicon.
 
 ### Windows
 
-1. Das neueste Windows-Release (Tag `windows-v…`) öffnen, `RedScan-Windows.zip` herunterladen und entpacken.
-2. `RedScan.exe` starten. Die App ist self-contained – .NET oder das Windows App SDK müssen **nicht** installiert sein.
-3. Die App ist nicht signiert. Zeigt **Windows SmartScreen** eine Warnung, „Weitere Informationen → Trotzdem ausführen“ wählen.
+1. Das neueste Windows-Release (Tag `windows-v…`) öffnen und `RedScan-Setup-<Version>.exe` herunterladen.
+2. Den Installer ausführen und die Windows-Abfrage (UAC) bestätigen. Installer und App sind nicht signiert:
+   Zeigt **Windows SmartScreen** eine Warnung, „Weitere Informationen → Trotzdem ausführen“ wählen.
+3. RedScan wird nach `C:\Program Files\RedScan` installiert und erscheint im **Startmenü**
+   (Desktop-Verknüpfung optional). Die App ist self-contained – .NET oder das Windows App SDK müssen **nicht** installiert sein.
 4. Fragt die **Windows-Firewall** nach, den Zugriff im **privaten Netzwerk** erlauben, damit Antworten der Geräte ankommen.
+
+**Update:** Einfach den neuen Installer ausführen – die bestehende Installation wird ersetzt, Verlauf und Einstellungen bleiben erhalten.
+**Deinstallieren:** *Einstellungen → Apps → Installierte Apps → RedScan → Deinstallieren* (oder Systemsteuerung → Programme).
+Verlauf und Einstellungen in `%LOCALAPPDATA%\RedScan` bleiben dabei erhalten und können bei Bedarf von Hand gelöscht werden.
+
+Ohne Installation (portable): `RedScan-Windows.zip` aus demselben Release entpacken und `RedScan.exe` starten.
 
 Voraussetzung: Windows 10 (ab 1809) oder Windows 11, 64-Bit.
 
@@ -103,8 +111,20 @@ msbuild windows/src/RedScan.App/RedScan.App.csproj /t:Publish /p:Configuration=R
   /p:RuntimeIdentifier=win-x64 /p:SelfContained=true /p:WindowsAppSDKSelfContained=true /p:WindowsPackageType=None
 ```
 
+Den Installer baut [Inno Setup](https://jrsoftware.org/isinfo.php) (6.3 oder neuer) aus dem Publish-Ordner;
+das Skript liegt in [`windows/installer/RedScan.iss`](windows/installer/RedScan.iss):
+
+```powershell
+# PublishDir = Ausgabeordner von /t:Publish (enthält RedScan.exe); Version wird sonst aus der RedScan.exe gelesen
+ISCC.exe /DPublishDir=C:\pfad\zu\publish /DAppVersion=1.0.6 windows\installer\RedScan.iss
+# -> dist\RedScan-Setup-1.0.6.exe
+```
+
 Die Windows-Version wird automatisch über GitHub Actions (`.github/workflows/windows.yml`) auf echtem Windows
-getestet und gebaut. Ein Tag `windows-v*` erzeugt automatisch ein Release mit der fertigen App.
+getestet und gebaut – inklusive Installertest (installieren, starten, Update, deinstallieren). Bei jedem Lauf liegen
+`RedScan-Setup-<Version>` und `RedScan-Windows` (ZIP) als Artefakte bereit. Ein Tag `windows-v<Version>` erzeugt
+automatisch ein Release mit Installer und ZIP; die Version im Tag muss zu `<Version>` in
+`windows/src/RedScan.App/RedScan.App.csproj` passen.
 
 ### Hersteller-Datenbank aktualisieren
 
@@ -134,6 +154,7 @@ windows/                    Windows-App (C#/.NET, WinUI 3)
   src/RedScan.Core/         Scan-Logik: Ping, ARP (iphlpapi), Ports, mDNS, SSDP, NetBIOS, Verlauf …
   src/RedScan.Tests/        xUnit-Tests (laufen in CI auf echtem Windows)
   src/RedScan.App/          WinUI-Oberfläche im roten Design
+  installer/RedScan.iss     Inno-Setup-Skript für RedScan-Setup-<Version>.exe
 
 .github/workflows/windows.yml   Test, Build und Release der Windows-Version
 ```

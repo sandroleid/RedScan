@@ -24,11 +24,16 @@ Gebaut und auf echtem Windows getestet über GitHub Actions.
 
 ## Installation
 
-1. Aus den [Releases](https://github.com/sandroleid/RedScan/releases) die `RedScan-Windows.zip`
-   (Release mit Tag `windows-v…`) herunterladen und entpacken.
-2. `RedScan.exe` starten. Die App ist self-contained – .NET oder das Windows App SDK müssen **nicht** installiert sein.
-3. Beim ersten Start blendet **Windows SmartScreen** evtl. eine Warnung ein (die App ist nicht signiert):
+1. Aus den [Releases](https://github.com/sandroleid/RedScan/releases) (Tag `windows-v…`)
+   `RedScan-Setup-<Version>.exe` herunterladen und ausführen, die UAC-Abfrage bestätigen.
+2. Der Installer legt RedScan unter `C:\Program Files\RedScan` ab, erstellt einen Startmenü-Eintrag
+   (Desktop-Verknüpfung optional) und trägt die App unter „Apps & Features“ ein (dort deinstallierbar).
+   Ein neuerer Installer aktualisiert eine bestehende Installation. Die App ist self-contained –
+   .NET oder das Windows App SDK müssen **nicht** installiert sein.
+3. **Windows SmartScreen** blendet evtl. eine Warnung ein (Installer und App sind nicht signiert):
    „Weitere Informationen“ → „Trotzdem ausführen“.
+
+Portable ohne Installation: `RedScan-Windows.zip` aus demselben Release entpacken und `RedScan.exe` starten.
 
 Voraussetzung: Windows 10 (ab 1809) oder Windows 11, 64-Bit.
 
@@ -52,8 +57,18 @@ msbuild windows/src/RedScan.App/RedScan.App.csproj /t:Publish /p:Configuration=R
   /p:RuntimeIdentifier=win-x64 /p:SelfContained=true /p:WindowsAppSDKSelfContained=true /p:WindowsPackageType=None
 ```
 
-Die GitHub-Actions-Pipeline (`.github/workflows/windows.yml`) führt beides bei jedem Push aus, der
-`windows/` betrifft, und erstellt bei einem Tag `windows-v*` automatisch ein Release mit der fertigen App.
+Installer (benötigt [Inno Setup](https://jrsoftware.org/isinfo.php) 6.3 oder neuer):
+
+```powershell
+# PublishDir = Ausgabeordner von /t:Publish (enthält RedScan.exe); Version wird sonst aus der RedScan.exe gelesen
+ISCC.exe /DPublishDir=C:\pfad\zu\publish /DAppVersion=1.0.6 windows\installer\RedScan.iss
+# -> dist\RedScan-Setup-1.0.6.exe
+```
+
+Die GitHub-Actions-Pipeline (`.github/workflows/windows.yml`) führt alles bei jedem Push aus, der
+`windows/` betrifft, testet den Installer (installieren, starten, Update, deinstallieren) und stellt
+`RedScan-Setup-<Version>.exe` als Artefakt bereit. Ein Tag `windows-v<Version>` (passend zu `<Version>`
+in `RedScan.App.csproj`) erstellt automatisch ein Release mit Installer und ZIP.
 
 ## Projektstruktur
 
@@ -64,6 +79,8 @@ src/
     *.cs            IPv4, Modelle, Hersteller-DB, Klassifizierung, Wake-on-LAN, Verlauf, Scanner
   RedScan.Tests/    xUnit-Tests (laufen in CI auf echtem Windows)
   RedScan.App/      WinUI-3-Oberfläche im roten Design
+installer/
+  RedScan.iss       Inno-Setup-Skript für RedScan-Setup-<Version>.exe
 ```
 
 ## Rechtlicher Hinweis
