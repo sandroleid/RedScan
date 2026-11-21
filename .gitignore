@@ -11,3 +11,4 @@ publish/
 artifacts/
 *.user
 .vs/
+dist/

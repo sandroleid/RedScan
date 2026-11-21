@@ -59,6 +59,35 @@ jobs:
           $zip = "RedScan-Windows.zip"
           Compress-Archive -Path "$dir/*" -DestinationPath $zip -Force
           "zip=$zip" >> $env:GITHUB_OUTPUT
+      - name: Version ermitteln
+        id: version
+        shell: pwsh
+        run: |
+          [xml]$proj = Get-Content windows/src/RedScan.App/RedScan.App.csproj
+          $v = ($proj.Project.PropertyGroup | ForEach-Object { $_.Version } | Where-Object { $_ } | Select-Object -First 1).Trim()
+          if (-not $v) { Write-Error "<Version> fehlt in RedScan.App.csproj"; exit 1 }
+          Write-Host "App-Version: $v"
+          if ("${{ github.ref }}" -like "refs/tags/windows-v*") {
+            $tagVersion = "${{ github.ref_name }}".Substring("windows-v".Length)
+            if ($tagVersion -ne $v) { Write-Error "Tag windows-v$tagVersion passt nicht zur Version $v in RedScan.App.csproj."; exit 1 }
+          }
+          "version=$v" >> $env:GITHUB_OUTPUT
+      - name: Installer bauen (Inno Setup)
+        id: setup
+        shell: pwsh
+        run: |
+          choco upgrade innosetup -y --no-progress | Out-Host
+          $iscc = Get-ChildItem "${env:ProgramFiles(x86)}\Inno Setup*\ISCC.exe", "$env:ProgramFiles\Inno Setup*\ISCC.exe" -ErrorAction SilentlyContinue |
+            Sort-Object { $_.VersionInfo.FileVersionRaw } -Descending | Select-Object -First 1
+          if (-not $iscc) { Write-Error "ISCC.exe (Inno Setup) nicht gefunden."; exit 1 }
+          Write-Host "Inno Setup: $($iscc.FullName) ($($iscc.VersionInfo.ProductVersion))"
+          $v = "${{ steps.version.outputs.version }}"
+          & $iscc.FullName "/DAppVersion=$v" "/DPublishDir=$PWD\publish" "/O$PWD\dist" windows\installer\RedScan.iss
+          if ($LASTEXITCODE -ne 0) { Write-Error "ISCC ist fehlgeschlagen ($LASTEXITCODE)."; exit 1 }
+          $exe = "dist\RedScan-Setup-$v.exe"
+          if (!(Test-Path $exe)) { Write-Error "$exe wurde nicht erzeugt."; exit 1 }
+          Write-Host ("Installer: {0} ({1:N1} MB)" -f $exe, ((Get-Item $exe).Length / 1MB))
+          "exe=$exe" >> $env:GITHUB_OUTPUT
       - name: Starttest (App dunkel + hell starten, scannen, Screenshots)
         shell: pwsh
         run: |
@@ -209,6 +238,74 @@ jobs:
           Get-WinEvent -FilterHashtable @{ LogName = 'Application'; StartTime = $start } -ErrorAction SilentlyContinue |
             Where-Object { $_.Level -le 2 } | Format-List TimeCreated, ProviderName, Id, Message | Out-String -Width 300 | Tee-Object smoke\events.txt
           Write-Host "Starttest bestanden: App läuft und hat gescannt (dunkel + hell), Umschalten und Speichern funktionieren."
+      - name: Installertest (installieren, starten, Update, deinstallieren)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force smoke | Out-Null
+          $v = "${{ steps.version.outputs.version }}"
+          $setup = Resolve-Path "${{ steps.setup.outputs.exe }}"
+          $dir = Join-Path $env:ProgramFiles "RedScan"
+          $exe = Join-Path $dir "RedScan.exe"
+          $regKey = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{1BF47354-12B0-4814-89C4-9CE9EF0FD3A6}_is1"
+          $startLnk = Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\RedScan.lnk"
+          $deskLnk = Join-Path $env:PUBLIC "Desktop\RedScan.lnk"
+          $log = Join-Path $env:LOCALAPPDATA "RedScan\startup.log"
+
+          function Invoke-Setup([string]$logName) {
+            $p = Start-Process -FilePath $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/TASKS=desktopicon","/LOG=`"$PWD\smoke\$logName`"" -Wait -PassThru
+            if ($p.ExitCode -ne 0) { Get-Content "smoke\$logName" -ErrorAction SilentlyContinue; Write-Error "Setup ($logName) ExitCode $($p.ExitCode)"; exit 1 }
+          }
+          function Test-Installed([string]$step) {
+            foreach ($f in @($exe, (Join-Path $dir "Assets\RedScan.ico"), (Join-Path $dir "unins000.exe"), $startLnk, $deskLnk)) {
+              if (!(Test-Path $f)) { Write-Error "[$step] fehlt: $f"; exit 1 }
+            }
+            if (!(Test-Path (Join-Path $dir "RedScan.pri")) -and !(Test-Path (Join-Path $dir "resources.pri"))) { Write-Error "[$step] PRI-Datei fehlt."; exit 1 }
+            $reg = Get-ItemProperty $regKey -ErrorAction SilentlyContinue
+            if (-not $reg) { Write-Error "[$step] Kein Eintrag unter Apps & Features ($regKey)."; exit 1 }
+            Write-Host "[$step] Apps & Features: $($reg.DisplayName) $($reg.DisplayVersion) / $($reg.Publisher) / $($reg.InstallLocation)"
+            if ($reg.DisplayVersion -ne $v) { Write-Error "[$step] DisplayVersion $($reg.DisplayVersion) statt $v."; exit 1 }
+            $count = @(Get-ChildItem "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall" | Where-Object { (Get-ItemProperty $_.PSPath).DisplayName -eq "RedScan" }).Count
+            if ($count -ne 1) { Write-Error "[$step] $count RedScan-Einträge unter Apps & Features (erwartet: 1)."; exit 1 }
+            $target = (New-Object -ComObject WScript.Shell).CreateShortcut($startLnk).TargetPath
+            if ($target -ne $exe) { Write-Error "[$step] Startmenü-Verknüpfung zeigt auf '$target'."; exit 1 }
+          }
+          function Start-Installed {
+            Remove-Item $log -ErrorAction SilentlyContinue
+            $p = Start-Process -FilePath $exe -ArgumentList "--no-dialogs" -PassThru
+            $null = $p.Handle
+            Start-Sleep -Seconds 10
+            if ($p.HasExited) { Get-Content $log -ErrorAction SilentlyContinue; Write-Error ("Installierte App hat sich beendet. ExitCode: 0x{0:X8}" -f $p.ExitCode); exit 1 }
+            if (-not (Select-String -Path $log -Pattern "Fenster-Icon gesetzt" -Quiet)) { Get-Content $log -ErrorAction SilentlyContinue; Write-Error "Installierte App: Fenster-Icon nicht gesetzt (Assets fehlen?)."; exit 1 }
+            return $p
+          }
+
+          # 1) Erstinstallation
+          if (Test-Path $dir) { Write-Error "$dir existiert schon vor der Installation."; exit 1 }
+          Invoke-Setup "install.log"
+          Test-Installed "Installation"
+          $p = Start-Installed
+          Write-Host "Installierte App läuft (PID $($p.Id))."
+
+          # 2) Update über die bestehende Installation, während die App läuft
+          New-Item -ItemType File (Join-Path $dir "veraltet.dll") -Force | Out-Null
+          Invoke-Setup "update.log"
+          Test-Installed "Update"
+          if (Test-Path (Join-Path $dir "veraltet.dll")) { Write-Error "Veraltete Datei der Vorversion wurde beim Update nicht entfernt."; exit 1 }
+          $p.Refresh()
+          if (-not $p.HasExited) { Stop-Process $p -Force; Write-Host "Hinweis: Laufende App wurde vom Setup nicht geschlossen (Datei war trotzdem ersetzbar)." }
+          else { Write-Host "Laufende App wurde vom Setup für das Update geschlossen." }
+          $p = Start-Installed
+          Stop-Process $p -Force
+          Start-Sleep -Seconds 2
+
+          # 3) Deinstallation über den Uninstaller aus Apps & Features
+          $uninst = (Get-ItemProperty $regKey).UninstallString.Trim('"')
+          $u = Start-Process -FilePath $uninst -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/LOG=`"$PWD\smoke\uninstall.log`"" -Wait -PassThru
+          for ($i = 0; $i -lt 30 -and (Test-Path $exe); $i++) { Start-Sleep -Seconds 2 }
+          foreach ($f in @($exe, $startLnk, $deskLnk)) { if (Test-Path $f) { Write-Error "Nach der Deinstallation noch vorhanden: $f"; exit 1 } }
+          if (Test-Path $regKey) { Write-Error "Eintrag unter Apps & Features nach der Deinstallation noch vorhanden."; exit 1 }
+          if (Test-Path $dir) { Get-ChildItem $dir -Recurse | Select-Object FullName | Out-Host; Write-Error "$dir wurde nicht entfernt."; exit 1 }
+          Write-Host "Installertest bestanden: Installation, Start, Update und Deinstallation funktionieren."
       - name: Starttest-Ergebnisse hochladen
         if: always()
         uses: actions/upload-artifact@v4
@@ -216,7 +313,12 @@ jobs:
           name: Starttest
           path: smoke
           if-no-files-found: ignore
-      - name: Artefakt hochladen
+      - name: Artefakt hochladen (Installer)
+        uses: actions/upload-artifact@v4
+        with:
+          name: RedScan-Setup-${{ steps.version.outputs.version }}
+          path: ${{ steps.setup.outputs.exe }}
+      - name: Artefakt hochladen (portable ZIP)
         uses: actions/upload-artifact@v4
         with:
           name: RedScan-Windows
@@ -225,14 +327,20 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/windows-v')
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ steps.pack.outputs.zip }}
+          files: |
+            ${{ steps.setup.outputs.exe }}
+            ${{ steps.pack.outputs.zip }}
           name: RedScan für Windows ${{ github.ref_name }}
           body: |
             Windows-Version von RedScan (C#/.NET, WinUI). Von GitHub Actions auf echtem Windows gebaut und getestet.
 
-            **Installation:** `RedScan-Windows.zip` herunterladen, entpacken, `RedScan.exe` starten.
-            Die App ist self-contained (kein .NET nötig). Beim ersten Start von SmartScreen ggf.
-            „Weitere Informationen → Trotzdem ausführen“ wählen.
+            **Installation:** `RedScan-Setup-${{ steps.version.outputs.version }}.exe` herunterladen und ausführen.
+            Der Installer legt RedScan unter `C:\Program Files\RedScan` ab, erstellt einen Startmenü-Eintrag
+            (optional eine Desktop-Verknüpfung) und trägt die App unter „Apps & Features“ ein (dort auch deinstallierbar).
+            Eine ältere Installation wird dabei automatisch aktualisiert. Die App ist self-contained (kein .NET nötig).
+            Installer und App sind nicht signiert: Zeigt SmartScreen eine Warnung, „Weitere Informationen → Trotzdem ausführen“ wählen.
+
+            Ohne Installation: `RedScan-Windows.zip` entpacken und `RedScan.exe` starten (portable).
 
             Die macOS-Version findest du in den übrigen Releases (Tags `v*`).
             Scanne nur Netzwerke, für die du eine Erlaubnis hast.
