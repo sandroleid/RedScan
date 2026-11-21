@@ -302,6 +302,15 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public bool HistoryVisible => ShowHistory;
     public bool DetailVisible => !ShowHistory && SelectedDevice != null;
 
+    // Darstellung (Hell/Dunkel)
+    public bool IsLightTheme => ThemeService.IsLight;
+    public bool IsDarkTheme => !ThemeService.IsLight;
+    public void RaiseTheme()
+    {
+        OnPropertyChanged(nameof(IsLightTheme));
+        OnPropertyChanged(nameof(IsDarkTheme));
+    }
+
     public string Subtitle
     {
         get

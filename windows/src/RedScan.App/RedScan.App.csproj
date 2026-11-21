@@ -19,7 +19,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
     <AssemblyName>RedScan</AssemblyName>
-    <Version>1.0.4</Version>
+    <Version>1.0.5</Version>
     <!-- Icon der .exe (Explorer, Verknüpfungen) -->
     <ApplicationIcon>Assets\RedScan.ico</ApplicationIcon>
   </PropertyGroup>

@@ -28,6 +28,7 @@ public partial class App : Application
     {
         try
         {
+            ThemeService.Initialize(Environment.GetCommandLineArgs());
             _window = new MainWindow();
             WindowHandle = WinRT.Interop.WindowNative.GetWindowHandle(_window);
             _window.Activate();

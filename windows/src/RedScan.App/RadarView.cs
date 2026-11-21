@@ -15,8 +15,17 @@ namespace RedScan.App;
 public sealed class RadarView : Grid
 {
     private static readonly Color Red = Color.FromArgb(255, 0xE8, 0x22, 0x30);
-    private static readonly Color RedBright = Color.FromArgb(255, 0xFF, 0x56, 0x61);
-    private static readonly Color Bg = Color.FromArgb(255, 0x0D, 0x08, 0x09);
+    private static readonly Color RedBrightDark = Color.FromArgb(255, 0xFF, 0x56, 0x61);
+    private static readonly Color RedBrightLight = Color.FromArgb(255, 0xC8, 0x10, 0x2E);
+    private static readonly Color BgDark = Color.FromArgb(255, 0x0D, 0x08, 0x09);
+    private static readonly Color BgLight = Color.FromArgb(255, 0xF6, 0xF1, 0xF2);
+
+    // Farben passend zur Darstellung (folgt ActualTheme des Elements)
+    private bool Light => ActualTheme == ElementTheme.Light;
+    private Color RedBright => Light ? RedBrightLight : RedBrightDark;
+    private Color Bg => Light ? BgLight : BgDark;
+    /// <summary>Leuchten im Hellmodus etwa halbiert.</summary>
+    private double Glow(double a) => Light ? a / 2 : a;
 
     private const double SweepSeconds = 2.4;
     private const int SweepWedges = 90; // 90 × 2° = 180° Schweif
@@ -35,6 +44,7 @@ public sealed class RadarView : Grid
     {
         Children.Add(_canvas);
         SizeChanged += (_, _) => Rebuild();
+        ActualThemeChanged += (_, _) => { _size = 0; Rebuild(); };
         Unloaded += (_, _) => _storyboard?.Stop();
         Loaded += (_, _) => ApplyActive();
     }
@@ -126,7 +136,7 @@ public sealed class RadarView : Grid
         DrawBlips();
 
         // Eigene Position in der Mitte
-        AddDot(_canvas, r, r, 13, WithAlpha(Red, 0.35));
+        AddDot(_canvas, r, r, 13, WithAlpha(Red, Glow(0.35)));
         AddDot(_canvas, r, r, 5, Color.FromArgb(255, 255, 255, 255));
 
         ApplyActive();
@@ -167,7 +177,7 @@ public sealed class RadarView : Grid
         foreach (var ip in _blips)
         {
             var p = Position(ip, _size);
-            AddDot(_blipLayer, r + p.X, r + p.Y, 12, WithAlpha(RedBright, 0.28)); // Leuchten
+            AddDot(_blipLayer, r + p.X, r + p.Y, 12, WithAlpha(RedBright, Glow(0.28))); // Leuchten
             AddDot(_blipLayer, r + p.X, r + p.Y, 6, RedBright);
         }
     }
