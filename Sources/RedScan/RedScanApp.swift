@@ -204,7 +204,10 @@ enum CICapture {
         }
         let win = mainWindow
         if let win, let screen = win.screen ?? NSScreen.main {
-            win.setFrame(screen.visibleFrame, display: true)
+            // Der CI-Bildschirm ist klein (1024×768): Breite so wählen, dass Liste und Detailansicht Platz haben.
+            // screencapture -l nimmt auch den Teil des Fensters auf, der über den Bildschirmrand ragt.
+            let v = screen.visibleFrame
+            win.setFrame(NSRect(x: v.minX, y: v.minY, width: max(v.width, 1440), height: v.height), display: true)
         }
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 2_000_000_000)
