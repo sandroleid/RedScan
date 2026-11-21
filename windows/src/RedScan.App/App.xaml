@@ -10,19 +10,6 @@
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
             </ResourceDictionary.MergedDictionaries>
 
-            <local:BoolToVisibilityConverter x:Key="BoolVis" xmlns:local="using:RedScan.App" />
-            <local:CountToVisibilityConverter x:Key="CountVis" xmlns:local="using:RedScan.App" />
-            <local:TextToVisibilityConverter x:Key="TextVis" xmlns:local="using:RedScan.App" />
-            <local:NavBackgroundConverter x:Key="NavBg" xmlns:local="using:RedScan.App" />
-            <local:TabTitleConverter x:Key="TabTitle" xmlns:local="using:RedScan.App" />
-            <local:KindGlyphConverter x:Key="KindGlyph" xmlns:local="using:RedScan.App" />
-            <local:KindLabelConverter x:Key="KindLabel" xmlns:local="using:RedScan.App" />
-
-            <!-- Rotes Farbschema: Akzentfarben (Verlauf ist in beiden Modi gleich) -->
-            <Color x:Key="RedColor">#E82230</Color>
-            <Color x:Key="RedBrightColor">#FF566B</Color>
-            <Color x:Key="RedDeepColor">#6B0A12</Color>
-
             <!-- Farb-Tokens je Darstellung (Default = Dunkel, unverändert; Light = Hell) -->
             <ResourceDictionary.ThemeDictionaries>
                 <ResourceDictionary x:Key="Default">
@@ -58,6 +45,19 @@
                     <SolidColorBrush x:Key="RedTintStrokeBrush" Color="#4DE82230" />
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
+
+            <local:BoolToVisibilityConverter x:Key="BoolVis" xmlns:local="using:RedScan.App" />
+            <local:CountToVisibilityConverter x:Key="CountVis" xmlns:local="using:RedScan.App" />
+            <local:TextToVisibilityConverter x:Key="TextVis" xmlns:local="using:RedScan.App" />
+            <local:NavBackgroundConverter x:Key="NavBg" xmlns:local="using:RedScan.App" />
+            <local:TabTitleConverter x:Key="TabTitle" xmlns:local="using:RedScan.App" />
+            <local:KindGlyphConverter x:Key="KindGlyph" xmlns:local="using:RedScan.App" />
+            <local:KindLabelConverter x:Key="KindLabel" xmlns:local="using:RedScan.App" />
+
+            <!-- Rotes Farbschema: Akzentfarben (Verlauf ist in beiden Modi gleich) -->
+            <Color x:Key="RedColor">#E82230</Color>
+            <Color x:Key="RedBrightColor">#FF566B</Color>
+            <Color x:Key="RedDeepColor">#6B0A12</Color>
 
             <LinearGradientBrush x:Key="RedGradient" StartPoint="0,0" EndPoint="1,1">
                 <GradientStop Color="{StaticResource RedBrightColor}" Offset="0" />
