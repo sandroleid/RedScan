@@ -57,11 +57,11 @@ jobs:
 
           # Wartet auf eine Marke im App-Log und fotografiert dann nur das App-Fenster
           shot() { # $1 = Marke, $2 = Datei
-            for i in $(seq 1 120); do
+            for i in $(seq 1 60); do
               grep -q "$1" "$log" 2>/dev/null && break
               if ! kill -0 $pid 2>/dev/null; then echo "::error::App ($name) hat sich beendet"; return 1; fi
               # Hängt die App? Stack des Hauptthreads sichern
-              [[ $i == 30 ]] && sample $pid 2 -file "$PWD/smoke/sample-$name.txt" >/dev/null 2>&1 || true
+              [[ $i == 20 ]] && sample $pid 2 -file "$PWD/smoke/sample-$name.txt" >/dev/null 2>&1 || true
               sleep 2
             done
             wid=$(grep -o 'Fenster-ID [0-9]*' "$log" | tail -1 | awk '{print $2}')
@@ -92,7 +92,7 @@ jobs:
             return $rc
           }
 
-          # Probestart ohne Scan (zeigt, ob das Fenster grundsätzlich erscheint)
+          # Aufwärm-Start ohne Scan (erste GUI-Starts auf frischen Runnern gehen manchmal ins Leere)
           run_app probe --theme dark || true
 
           for theme in dark light; do

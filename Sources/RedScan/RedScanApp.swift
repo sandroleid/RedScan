@@ -1,32 +1,46 @@
 import SwiftUI
 import AppKit
 
+/// Gemeinsame App-Zustände – auch für den AppDelegate erreichbar (Scan-Start ohne Fenster, CI).
+@MainActor
+enum AppModel {
+    static let history = HistoryStore()
+    static let scanner = NetScanner(history: history)
+    static let nav = SelectionState()
+    static let appearance = AppearanceStore()
+
+    /// Wurzelansicht mit allen Umgebungsobjekten (für die Szene und ein ggf. selbst erzeugtes Fenster).
+    static func rootView() -> some View {
+        RootView()
+            .environmentObject(scanner)
+            .environmentObject(history)
+            .environmentObject(nav)
+            .environmentObject(appearance)
+    }
+}
+
+struct RootView: View {
+    @EnvironmentObject var appearance: AppearanceStore
+
+    var body: some View {
+        ContentView()
+            .frame(minWidth: 1080, minHeight: 680)
+            .preferredColorScheme(appearance.mode.colorScheme)
+            .foregroundStyle(Theme.text)
+            .tint(Theme.red)
+            .onAppear { appearance.apply() }
+    }
+}
+
 @main
 struct RedScanApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @StateObject private var history: HistoryStore
-    @StateObject private var scanner: NetScanner
-    @StateObject private var nav = SelectionState()
-    @StateObject private var appearance = AppearanceStore()
-
-    init() {
-        let h = HistoryStore()
-        _history = StateObject(wrappedValue: h)
-        _scanner = StateObject(wrappedValue: NetScanner(history: h))
-    }
+    @ObservedObject private var scanner = AppModel.scanner
+    @ObservedObject private var nav = AppModel.nav
 
     var body: some Scene {
-        WindowGroup("RedScan") {
-            ContentView()
-                .environmentObject(scanner)
-                .environmentObject(history)
-                .environmentObject(nav)
-                .environmentObject(appearance)
-                .frame(minWidth: 1080, minHeight: 680)
-                .preferredColorScheme(appearance.mode.colorScheme)
-                .foregroundStyle(Theme.text)
-                .tint(Theme.red)
-                .onAppear { appearance.apply() }
+        WindowGroup("RedScan", id: "main") {
+            AppModel.rootView()
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1400, height: 860)
@@ -47,6 +61,9 @@ struct RedScanApp: App {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var activity: NSObjectProtocol?
+    private var fallbackWindow: NSWindow?
+
     func applicationWillFinishLaunching(_ notification: Notification) {
         setvbuf(stdout, nil, _IOLBF, 0) // Ausgaben sofort sichtbar (CI-Log)
         // Für CI: wirksame Darstellung ausgeben und beenden (prüft Speicherung und --theme)
@@ -55,21 +72,57 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             exit(0)
         }
         NSApp.appearance = Appearance.effectiveAtLaunch.nsAppearance
+        // Autoscan/CI: kein App Nap, sonst laufen Timer im Hintergrund stark verzögert
+        if CICapture.enabled || CommandLine.arguments.contains("--autoscan") {
+            activity = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .idleSystemSleepDisabled], reason: "RedScan Autoscan/CI")
+        }
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         raiseFileLimit()
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
-        if CICapture.enabled {
-            print("Gestartet, Darstellung \(Appearance.effectiveAtLaunch.rawValue), Fenster: \(NSApp.windows.count)")
-            Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 10_000_000_000)
-                for w in NSApp.windows {
-                    print("Fenster: \(type(of: w)) sichtbar=\(w.isVisible) frame=\(w.frame) titel=\(w.title)")
-                }
-            }
+        let scanner = AppModel.scanner
+        let autoscan = CommandLine.arguments.contains("--autoscan")
+        // Scan unabhängig davon starten, ob schon ein Fenster da ist
+        if autoscan {
+            Task { @MainActor in scanner.start() }
         }
+        guard CICapture.enabled else { return }
+        print("Gestartet, Darstellung \(Appearance.effectiveAtLaunch.rawValue), Fenster: \(NSApp.windows.count)")
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            self.ensureWindow()
+            // Warten, bis der Scan fertig ist (ohne --autoscan sofort), dann Bilder vorbereiten
+            while autoscan && (scanner.isScanning || scanner.lastScan == nil) {
+                try? await Task.sleep(nanoseconds: 500_000_000)
+            }
+            self.ensureWindow()
+            CICapture.run(scanner: scanner, selection: AppModel.nav, appearance: AppModel.appearance)
+        }
+    }
+
+    /// Falls SwiftUI (noch) kein Fenster geöffnet hat, selbst eins erzeugen.
+    @MainActor
+    private func ensureWindow() {
+        if let w = CICapture.mainWindow {
+            w.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1400, height: 860),
+                         styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+                         backing: .buffered, defer: false)
+        w.titlebarAppearsTransparent = true
+        w.titleVisibility = .hidden
+        w.title = "RedScan"
+        w.isReleasedWhenClosed = false
+        w.contentView = NSHostingView(rootView: AppModel.rootView())
+        w.center()
+        w.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        fallbackWindow = w
+        print("Kein Fenster von SwiftUI – Fenster selbst geöffnet")
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
@@ -78,7 +131,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 struct ContentView: View {
     @EnvironmentObject var scanner: NetScanner
     @EnvironmentObject var sel: SelectionState
-    @EnvironmentObject var appearance: AppearanceStore
 
     var body: some View {
         HStack(spacing: 0) {
@@ -114,18 +166,9 @@ struct ContentView: View {
         .animation(.snappy, value: scanner.toast)
         .onAppear {
             if CICapture.enabled { print("Hauptansicht erschienen") }
-            if CommandLine.arguments.contains("--autoscan") {
-                scanner.start()
-            } else if CICapture.enabled {
-                Task { @MainActor in
-                    try? await Task.sleep(nanoseconds: 2_000_000_000)
-                    CICapture.run(scanner: scanner, selection: sel, appearance: appearance)
-                }
-            }
         }
         .onChange(of: scanner.isScanning) { _, scanning in
             if scanning, let s = sel.ip, scanner.devices[s] == nil { sel.ip = nil }
-            if !scanning, scanner.lastScan != nil { CICapture.run(scanner: scanner, selection: sel, appearance: appearance) }
         }
     }
 }
@@ -144,6 +187,10 @@ enum CICapture {
         return Appearance(rawValue: args[i + 1].lowercased())
     }
 
+    static var mainWindow: NSWindow? {
+        NSApp.windows.first { $0.isVisible && $0.contentView != nil && !($0 is NSPanel) && $0.frame.width > 600 }
+    }
+
     static func run(scanner: NetScanner, selection: SelectionState, appearance: AppearanceStore) {
         guard enabled, !done else { return }
         done = true
@@ -155,7 +202,7 @@ enum CICapture {
         if selection.ip == nil {
             selection.ip = scanner.sortedDevices.first(where: \.isGateway)?.ip ?? scanner.sortedDevices.first?.ip
         }
-        let win = NSApp.windows.first { $0.isVisible && $0.contentView != nil && !($0 is NSPanel) }
+        let win = mainWindow
         if let win, let screen = win.screen ?? NSScreen.main {
             win.setFrame(screen.visibleFrame, display: true)
         }
