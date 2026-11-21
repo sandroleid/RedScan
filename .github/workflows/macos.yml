@@ -1,0 +1,140 @@
+name: macOS
+
+on:
+  push:
+    branches: [main]
+    paths: ['Sources/**', 'Resources/**', 'Package.swift', 'build.sh', '.github/workflows/macos.yml']
+    # Nur macOS-Tags wie v1.0.3 (windows-v* passt hier nicht, da es nicht mit "v" beginnt)
+    tags: ['v*']
+  pull_request:
+    paths: ['Sources/**', 'Resources/**', 'Package.swift', 'build.sh', '.github/workflows/macos.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  app:
+    name: macOS-App bauen und testen
+    runs-on: macos-latest
+    env:
+      APP: build/RedScan.app
+      BIN: build/RedScan.app/Contents/MacOS/RedScan
+      DOMAIN: de.privat.redscan
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version lesen
+        id: ver
+        run: |
+          v=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Resources/Info.plist)
+          b=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' Resources/Info.plist)
+          echo "Version $v (Build $b)"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "zip=RedScan-macOS-$v.zip" >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_REF" == refs/tags/v* && "${GITHUB_REF#refs/tags/v}" != "$v" ]]; then
+            echo "::error::Tag ${GITHUB_REF#refs/tags/} passt nicht zur Version $v in Info.plist"; exit 1
+          fi
+
+      - name: Bauen
+        run: |
+          swift --version
+          ./build.sh
+
+      - name: Starttest (Scan + Screenshots dunkel/hell)
+        run: |
+          mkdir -p smoke
+          defaults delete "$DOMAIN" appearance 2>/dev/null || true
+          iface=$(route -n get default 2>/dev/null | awk '/interface:/{print $2}')
+          ip=$(ipconfig getifaddr "${iface:-en0}" || true)
+          target="${ip%.*}.0/24"
+          echo "Runner: Interface $iface, IP $ip -> Ziel $target"
+          system_profiler SPDisplaysDataType | grep -i resolution || true
+          fail=0
+
+          # $1 = Name, restliche Argumente gehen an die App
+          run_app() {
+            name=$1; shift
+            rm -f "smoke/snapshot-$name.png"
+            "$BIN" "$@" --snapshot "$PWD/smoke/snapshot-$name.png" > "smoke/app-$name.log" 2>&1 &
+            pid=$!
+            for i in $(seq 1 150); do
+              sleep 2
+              if ! kill -0 $pid 2>/dev/null; then echo "::error::App ($name) hat sich beendet"; cat "smoke/app-$name.log"; return 1; fi
+              [[ -f "smoke/snapshot-$name.png" ]] && break
+            done
+            sleep 1
+            screencapture -x "smoke/screenshot-$name.png" || echo "::warning::screencapture ($name) fehlgeschlagen"
+            [[ -f "smoke/snapshot-$name.png" ]] || echo "::warning::Kein In-App-Snapshot ($name) innerhalb von 5 Minuten"
+            kill $pid 2>/dev/null; wait $pid 2>/dev/null || true
+            echo "===== App-Log ($name) ====="; cat "smoke/app-$name.log"
+          }
+
+          for theme in dark light; do
+            dump="$PWD/smoke/scan-$theme.json"
+            run_app "$theme" --autoscan --target "$target" --dump "$dump" --theme "$theme" || fail=1
+            if [[ -f "$dump" ]]; then
+              echo "Scan ($theme): $(jq length "$dump") Geräte"
+              jq -r '.[] | "\(.ip)  \(.mac // "-")  \(.vendor // "-")  \(.kind)"' "$dump" || true
+            else
+              echo "::error::Scan ($theme) wurde nicht fertig (kein --dump)"; fail=1
+            fi
+            # --theme darf die gespeicherte Wahl nicht verändern
+            if defaults read "$DOMAIN" appearance 2>/dev/null; then echo "::error::--theme $theme hat UserDefaults geändert"; fail=1; fi
+          done
+
+          # Live-Umschalten wie per Klick: Start dunkel, dann auf hell -> muss gespeichert werden
+          run_app switched --theme dark --switch-appearance light || fail=1
+          stored=$(defaults read "$DOMAIN" appearance 2>/dev/null || echo "-")
+          echo "Gespeichert nach Live-Umschalten: $stored"
+          [[ "$stored" == "light" ]] || { echo "::error::Umschalten wurde nicht gespeichert"; fail=1; }
+          grep -q "Darstellung live umgeschaltet: light" smoke/app-switched.log || { echo "::error::Live-Umschalten nicht im Log"; fail=1; }
+
+          for name in dark light; do
+            [[ -f "smoke/snapshot-$name.png" || -f "smoke/screenshot-$name.png" ]] || { echo "::error::Kein Bild für $name"; fail=1; }
+          done
+          exit $fail
+
+      - name: Speicherung der Darstellung prüfen
+        run: |
+          check() { # $1 = erwartete Ausgabe, Rest = Argumente
+            want=$1; shift
+            got=$(perl -e 'alarm 30; exec @ARGV' "$BIN" --print-appearance "$@" | tail -1)
+            echo "Argumente: ${*:-(keine)} -> $got"
+            [[ "$got" == "$want" ]] || { echo "::error::Erwartet '$want', erhalten '$got'"; exit 1; }
+          }
+          defaults delete "$DOMAIN" appearance 2>/dev/null || true
+          check "appearance=dark stored=-"                       # Standard: dunkel
+          check "appearance=light stored=-" --theme light        # Override ohne Speichern
+          defaults write "$DOMAIN" appearance light
+          check "appearance=light stored=light"                  # gespeicherte Wahl wird wiederhergestellt
+          check "appearance=dark stored=light" --theme dark      # Override schlägt gespeicherte Wahl
+          defaults write "$DOMAIN" appearance kaputt
+          check "appearance=dark stored=kaputt"                  # ungültig -> dunkel
+          defaults delete "$DOMAIN" appearance
+
+      - name: App packen
+        run: ditto -c -k --keepParent "$APP" "${{ steps.ver.outputs.zip }}"
+
+      - name: Screenshots hochladen
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Starttest-macOS
+          path: smoke
+          if-no-files-found: ignore
+
+      - name: Artefakt hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: RedScan-macOS-${{ steps.ver.outputs.version }}
+          path: ${{ steps.ver.outputs.zip }}
+
+      - name: Release veröffentlichen (bei Tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.ver.outputs.zip }}
+          name: RedScan-macOS ${{ steps.ver.outputs.version }}
+          body: |
+            Light & Dark Mode hinzugefügt
