@@ -6,10 +6,11 @@
     xmlns:core="using:RedScan.Core"
     xmlns:local="using:RedScan.App"
     mc:Ignorable="d"
+    Foreground="{ThemeResource TextBrush}"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006">
 
-    <Grid Background="{StaticResource BgBrush}">
+    <Grid Background="{ThemeResource BgBrush}">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="300" />
             <ColumnDefinition Width="1" />
@@ -18,7 +19,7 @@
         </Grid.ColumnDefinitions>
 
         <!-- ============ SEITENLEISTE ============ -->
-        <ScrollViewer Grid.Column="0" Background="{StaticResource PanelBrush}">
+        <ScrollViewer Grid.Column="0" Background="{ThemeResource PanelBrush}">
             <StackPanel Padding="18" Spacing="16">
                 <!-- Kopf -->
                 <StackPanel Orientation="Horizontal" Spacing="10">
@@ -26,8 +27,8 @@
                         <FontIcon Glyph="&#xEC05;" FontFamily="Segoe Fluent Icons" Foreground="White" FontSize="18" />
                     </Border>
                     <StackPanel>
-                        <TextBlock Text="RedScan" FontSize="20" FontWeight="Bold" />
-                        <TextBlock Text="Netzwerk-Scanner" FontSize="11" Foreground="{StaticResource DimBrush}" />
+                        <TextBlock Text="RedScan" FontSize="20" FontWeight="Bold" Foreground="{ThemeResource TextBrush}" />
+                        <TextBlock Text="Netzwerk-Scanner" FontSize="11" Foreground="{ThemeResource DimBrush}" />
                     </StackPanel>
                 </StackPanel>
 
@@ -39,7 +40,7 @@
                     </Grid.ColumnDefinitions>
                     <Button Grid.Column="0" Click="OnShowDevices" HorizontalAlignment="Stretch"
                             Background="{x:Bind VM.DevicesVisible, Mode=OneWay, Converter={StaticResource NavBg}}"
-                            Foreground="White" CornerRadius="9" Padding="8">
+                            Foreground="{x:Bind local:Palette.NavForeground(VM.DevicesVisible, VM.IsLightTheme), Mode=OneWay}" CornerRadius="9" Padding="8">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                             <FontIcon Glyph="&#xE80A;" FontFamily="Segoe Fluent Icons" FontSize="13" />
                             <TextBlock Text="Geräte" FontSize="12" FontWeight="SemiBold" />
@@ -47,7 +48,7 @@
                     </Button>
                     <Button Grid.Column="1" Click="OnShowHistory" HorizontalAlignment="Stretch"
                             Background="{x:Bind VM.HistoryVisible, Mode=OneWay, Converter={StaticResource NavBg}}"
-                            Foreground="White" CornerRadius="9" Padding="8">
+                            Foreground="{x:Bind local:Palette.NavForeground(VM.HistoryVisible, VM.IsLightTheme), Mode=OneWay}" CornerRadius="9" Padding="8">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                             <FontIcon Glyph="&#xE81C;" FontFamily="Segoe Fluent Icons" FontSize="13" />
                             <TextBlock Text="Verlauf" FontSize="12" FontWeight="SemiBold" />
@@ -63,62 +64,62 @@
                         Content="{x:Bind VM.ScanButtonText, Mode=OneWay}" />
 
                 <StackPanel Spacing="6">
-                    <ProgressBar Value="{x:Bind VM.Progress, Mode=OneWay}" Maximum="1" Foreground="{StaticResource RedBrush}" />
-                    <TextBlock Text="{x:Bind VM.Phase, Mode=OneWay}" FontSize="11" Foreground="{StaticResource DimBrush}" TextWrapping="Wrap" />
+                    <ProgressBar Value="{x:Bind VM.Progress, Mode=OneWay}" Maximum="1" Foreground="{ThemeResource RedBrush}" />
+                    <TextBlock Text="{x:Bind VM.Phase, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource DimBrush}" TextWrapping="Wrap" />
                 </StackPanel>
 
                 <!-- Hinweis fehlende Berechtigung / großes Netz -->
-                <Border Background="#22E82230" BorderBrush="#73E82230" BorderThickness="1" CornerRadius="12" Padding="12"
+                <Border Background="{ThemeResource RedTintBrush}" BorderBrush="{ThemeResource RedTintStrokeBrush}" BorderThickness="1" CornerRadius="12" Padding="12"
                         Visibility="{x:Bind VM.ArpBlocked, Mode=OneWay, Converter={StaticResource BoolVis}}">
                     <StackPanel Spacing="6">
-                        <TextBlock Text="Zugriff eingeschränkt" FontWeight="Bold" Foreground="{StaticResource RedBrightBrush}" FontSize="12" />
+                        <TextBlock Text="Zugriff eingeschränkt" FontWeight="Bold" Foreground="{ThemeResource RedBrightBrush}" FontSize="12" />
                         <TextBlock Text="Die ARP-Tabelle ist leer – MAC-Adressen und Hersteller fehlen möglicherweise."
-                                   FontSize="11" Foreground="{StaticResource DimBrush}" TextWrapping="Wrap" />
+                                   FontSize="11" Foreground="{ThemeResource DimBrush}" TextWrapping="Wrap" />
                     </StackPanel>
                 </Border>
 
                 <!-- Ziel -->
                 <TextBox PlaceholderText="Ziel, z. B. 192.168.1.0/24"
                          Text="{x:Bind VM.CustomTarget, Mode=TwoWay}"
-                         Background="#40000000" />
+                         Background="{ThemeResource InsetBrush}" Foreground="{ThemeResource TextBrush}" />
 
                 <!-- Netzwerk-Infos -->
                 <Border Style="{StaticResource CardBorder}">
                     <StackPanel Spacing="8">
                         <TextBlock Text="NETZWERK" Style="{StaticResource SectionLabel}" />
                         <StackPanel Orientation="Horizontal" Spacing="8" Visibility="{x:Bind VM.HasSsid, Mode=OneWay, Converter={StaticResource BoolVis}}">
-                            <TextBlock Text="WLAN" Width="74" FontSize="11" Foreground="{StaticResource DimBrush}" />
-                            <TextBlock Text="{x:Bind VM.NetSsid, Mode=OneWay}" FontSize="11" TextWrapping="Wrap" />
+                            <TextBlock Text="WLAN" Width="74" FontSize="11" Foreground="{ThemeResource DimBrush}" />
+                            <TextBlock Text="{x:Bind VM.NetSsid, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource TextBrush}" TextWrapping="Wrap" />
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                            <TextBlock Text="Interface" Width="74" FontSize="11" Foreground="{StaticResource DimBrush}" />
-                            <TextBlock Text="{x:Bind VM.NetInterface, Mode=OneWay}" FontSize="11" TextWrapping="Wrap" />
+                            <TextBlock Text="Interface" Width="74" FontSize="11" Foreground="{ThemeResource DimBrush}" />
+                            <TextBlock Text="{x:Bind VM.NetInterface, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource TextBrush}" TextWrapping="Wrap" />
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                            <TextBlock Text="Eigene IP" Width="74" FontSize="11" Foreground="{StaticResource DimBrush}" />
-                            <TextBlock Text="{x:Bind VM.NetIp, Mode=OneWay}" FontSize="11" FontFamily="Consolas" IsTextSelectionEnabled="True" />
+                            <TextBlock Text="Eigene IP" Width="74" FontSize="11" Foreground="{ThemeResource DimBrush}" />
+                            <TextBlock Text="{x:Bind VM.NetIp, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource TextBrush}" FontFamily="Consolas" IsTextSelectionEnabled="True" />
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                            <TextBlock Text="MAC" Width="74" FontSize="11" Foreground="{StaticResource DimBrush}" />
-                            <TextBlock Text="{x:Bind VM.NetMac, Mode=OneWay}" FontSize="11" FontFamily="Consolas" IsTextSelectionEnabled="True" />
+                            <TextBlock Text="MAC" Width="74" FontSize="11" Foreground="{ThemeResource DimBrush}" />
+                            <TextBlock Text="{x:Bind VM.NetMac, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource TextBrush}" FontFamily="Consolas" IsTextSelectionEnabled="True" />
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                            <TextBlock Text="Subnetz" Width="74" FontSize="11" Foreground="{StaticResource DimBrush}" />
-                            <TextBlock Text="{x:Bind VM.NetCidr, Mode=OneWay}" FontSize="11" FontFamily="Consolas" IsTextSelectionEnabled="True" />
+                            <TextBlock Text="Subnetz" Width="74" FontSize="11" Foreground="{ThemeResource DimBrush}" />
+                            <TextBlock Text="{x:Bind VM.NetCidr, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource TextBrush}" FontFamily="Consolas" IsTextSelectionEnabled="True" />
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                            <TextBlock Text="Gateway" Width="74" FontSize="11" Foreground="{StaticResource DimBrush}" />
-                            <TextBlock Text="{x:Bind VM.NetGateway, Mode=OneWay}" FontSize="11" FontFamily="Consolas" IsTextSelectionEnabled="True" />
+                            <TextBlock Text="Gateway" Width="74" FontSize="11" Foreground="{ThemeResource DimBrush}" />
+                            <TextBlock Text="{x:Bind VM.NetGateway, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource TextBrush}" FontFamily="Consolas" IsTextSelectionEnabled="True" />
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                            <TextBlock Text="DNS" Width="74" FontSize="11" Foreground="{StaticResource DimBrush}" />
-                            <TextBlock Text="{x:Bind VM.NetDns, Mode=OneWay}" FontSize="11" FontFamily="Consolas" TextWrapping="Wrap" />
+                            <TextBlock Text="DNS" Width="74" FontSize="11" Foreground="{ThemeResource DimBrush}" />
+                            <TextBlock Text="{x:Bind VM.NetDns, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource TextBrush}" FontFamily="Consolas" TextWrapping="Wrap" />
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                            <TextBlock Text="Hosts" Width="74" FontSize="11" Foreground="{StaticResource DimBrush}" />
-                            <TextBlock Text="{x:Bind VM.NetHosts, Mode=OneWay}" FontSize="11" />
+                            <TextBlock Text="Hosts" Width="74" FontSize="11" Foreground="{ThemeResource DimBrush}" />
+                            <TextBlock Text="{x:Bind VM.NetHosts, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource TextBrush}" />
                         </StackPanel>
-                        <TextBlock Text="{x:Bind VM.NetNote, Mode=OneWay}" FontSize="10" Foreground="{StaticResource RedBrightBrush}" TextWrapping="Wrap"
+                        <TextBlock Text="{x:Bind VM.NetNote, Mode=OneWay}" FontSize="10" Foreground="{ThemeResource RedBrightBrush}" TextWrapping="Wrap"
                                    Visibility="{x:Bind VM.HasNote, Mode=OneWay, Converter={StaticResource BoolVis}}" />
                     </StackPanel>
                 </Border>
@@ -132,27 +133,61 @@
                     </Grid.ColumnDefinitions>
                     <Border Grid.Column="0" Style="{StaticResource CardBorder}" Padding="8">
                         <StackPanel HorizontalAlignment="Center">
-                            <TextBlock Text="{x:Bind VM.DeviceCount, Mode=OneWay}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource RedBrightBrush}" HorizontalAlignment="Center" />
-                            <TextBlock Text="Geräte" FontSize="10" Foreground="{StaticResource DimBrush}" HorizontalAlignment="Center" />
+                            <TextBlock Text="{x:Bind VM.DeviceCount, Mode=OneWay}" FontSize="20" FontWeight="Bold" Foreground="{ThemeResource RedBrightBrush}" HorizontalAlignment="Center" />
+                            <TextBlock Text="Geräte" FontSize="10" Foreground="{ThemeResource DimBrush}" HorizontalAlignment="Center" />
                         </StackPanel>
                     </Border>
                     <Border Grid.Column="1" Style="{StaticResource CardBorder}" Padding="8">
                         <StackPanel HorizontalAlignment="Center">
-                            <TextBlock Text="{x:Bind VM.TotalOpenPorts, Mode=OneWay}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource RedBrightBrush}" HorizontalAlignment="Center" />
-                            <TextBlock Text="Ports" FontSize="10" Foreground="{StaticResource DimBrush}" HorizontalAlignment="Center" />
+                            <TextBlock Text="{x:Bind VM.TotalOpenPorts, Mode=OneWay}" FontSize="20" FontWeight="Bold" Foreground="{ThemeResource RedBrightBrush}" HorizontalAlignment="Center" />
+                            <TextBlock Text="Ports" FontSize="10" Foreground="{ThemeResource DimBrush}" HorizontalAlignment="Center" />
                         </StackPanel>
                     </Border>
                     <Border Grid.Column="2" Style="{StaticResource CardBorder}" Padding="8">
                         <StackPanel HorizontalAlignment="Center">
-                            <TextBlock Text="{x:Bind VM.TotalServices, Mode=OneWay}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource RedBrightBrush}" HorizontalAlignment="Center" />
-                            <TextBlock Text="Dienste" FontSize="10" Foreground="{StaticResource DimBrush}" HorizontalAlignment="Center" />
+                            <TextBlock Text="{x:Bind VM.TotalServices, Mode=OneWay}" FontSize="20" FontWeight="Bold" Foreground="{ThemeResource RedBrightBrush}" HorizontalAlignment="Center" />
+                            <TextBlock Text="Dienste" FontSize="10" Foreground="{ThemeResource DimBrush}" HorizontalAlignment="Center" />
                         </StackPanel>
                     </Border>
                 </Grid>
+
+                <!-- Darstellung (Hell/Dunkel) -->
+                <Border Style="{StaticResource CardBorder}" ToolTipService.ToolTip="Darstellung der App: hell oder dunkel">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="DARSTELLUNG" Style="{StaticResource SectionLabel}" />
+                        <Grid ColumnSpacing="6" Padding="4" CornerRadius="12" Background="{ThemeResource InsetBrush}"
+                              BorderBrush="{ThemeResource StrokeBrush}" BorderThickness="1">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="0" Click="OnThemeDark" HorizontalAlignment="Stretch" AutomationProperties.Name="Dunkel"
+                                    Background="{x:Bind VM.IsDarkTheme, Mode=OneWay, Converter={StaticResource NavBg}}"
+                                    Foreground="{x:Bind local:Palette.SegmentForeground(VM.IsDarkTheme, VM.IsLightTheme), Mode=OneWay}"
+                                    BorderThickness="0" CornerRadius="9" Padding="8,7"
+                                    ToolTipService.ToolTip="Darstellung der App: hell oder dunkel">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE708;" FontFamily="Segoe Fluent Icons" FontSize="12" />
+                                    <TextBlock Text="Dunkel" FontSize="12" FontWeight="SemiBold" />
+                                </StackPanel>
+                            </Button>
+                            <Button Grid.Column="1" Click="OnThemeLight" HorizontalAlignment="Stretch" AutomationProperties.Name="Hell"
+                                    Background="{x:Bind VM.IsLightTheme, Mode=OneWay, Converter={StaticResource NavBg}}"
+                                    Foreground="{x:Bind local:Palette.SegmentForeground(VM.IsLightTheme, VM.IsLightTheme), Mode=OneWay}"
+                                    BorderThickness="0" CornerRadius="9" Padding="8,7"
+                                    ToolTipService.ToolTip="Darstellung der App: hell oder dunkel">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE706;" FontFamily="Segoe Fluent Icons" FontSize="12" />
+                                    <TextBlock Text="Hell" FontSize="12" FontWeight="SemiBold" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                    </StackPanel>
+                </Border>
             </StackPanel>
         </ScrollViewer>
 
-        <Rectangle Grid.Column="1" Fill="{StaticResource StrokeBrush}" />
+        <Rectangle Grid.Column="1" Fill="{ThemeResource StrokeBrush}" />
 
         <!-- ============ HAUPTBEREICH ============ -->
         <Grid Grid.Column="2">
@@ -169,11 +204,11 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                    <TextBlock Text="{x:Bind VM.ShowHistory, Mode=OneWay, Converter={StaticResource TabTitle}}" FontSize="24" FontWeight="Bold" />
-                    <TextBlock Text="{x:Bind VM.Subtitle, Mode=OneWay}" FontSize="11" Foreground="{StaticResource DimBrush}" />
+                    <TextBlock Text="{x:Bind VM.ShowHistory, Mode=OneWay, Converter={StaticResource TabTitle}}" FontSize="24" FontWeight="Bold" Foreground="{ThemeResource TextBrush}" />
+                    <TextBlock Text="{x:Bind VM.Subtitle, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource DimBrush}" />
                 </StackPanel>
                 <TextBox Grid.Column="1" Width="260" PlaceholderText="Suchen: IP, Name, Hersteller, Port …"
-                         TextChanged="OnSearchChanged" VerticalAlignment="Center" Background="{StaticResource CardBrush}" />
+                         TextChanged="OnSearchChanged" VerticalAlignment="Center" Background="{ThemeResource CardBrush}" Foreground="{ThemeResource TextBrush}" />
                 <Button Grid.Column="2" Style="{StaticResource GhostButton}" VerticalAlignment="Center">
                     <FontIcon Glyph="&#xEDE1;" FontFamily="Segoe Fluent Icons" FontSize="14" />
                     <Button.Flyout>
@@ -191,8 +226,8 @@
                           SelectionChanged="OnDeviceSelected" IsItemClickEnabled="False">
                     <GridView.ItemTemplate>
                         <DataTemplate x:DataType="core:Device">
-                            <Border Width="240" Margin="0,0,14,14" Background="{StaticResource CardBrush}"
-                                    BorderBrush="{StaticResource StrokeBrush}" BorderThickness="1" CornerRadius="16" Padding="14">
+                            <Border Width="240" Margin="0,0,14,14" Background="{ThemeResource CardBrush}"
+                                    BorderBrush="{ThemeResource StrokeBrush}" BorderThickness="1" CornerRadius="16" Padding="14">
                                 <StackPanel Spacing="10">
                                     <Grid>
                                         <Border Width="42" Height="42" CornerRadius="12" Background="{StaticResource RedGradient}" HorizontalAlignment="Left">
@@ -205,18 +240,18 @@
                                         </Border>
                                     </Grid>
                                     <StackPanel Spacing="2">
-                                        <TextBlock Text="{x:Bind DisplayName, Mode=OneWay}" FontSize="14" FontWeight="Bold" TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Text="{x:Bind Ip}" FontSize="12" FontFamily="Consolas" Foreground="{StaticResource RedBrightBrush}" />
-                                        <TextBlock Text="{x:Bind VendorDisplay, Mode=OneWay}" FontSize="11" Foreground="{StaticResource DimBrush}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{x:Bind DisplayName, Mode=OneWay}" FontSize="14" FontWeight="Bold" Foreground="{ThemeResource TextBrush}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{x:Bind Ip}" FontSize="12" FontFamily="Consolas" Foreground="{ThemeResource RedBrightBrush}" />
+                                        <TextBlock Text="{x:Bind VendorDisplay, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource DimBrush}" TextTrimming="CharacterEllipsis" />
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" Spacing="6">
-                                        <Border CornerRadius="10" Padding="7,3" Background="#24E82230">
-                                            <TextBlock Text="{x:Bind Kind, Mode=OneWay, Converter={StaticResource KindLabel}}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource RedBrightBrush}" />
+                                        <Border CornerRadius="10" Padding="7,3" Background="{ThemeResource RedPillBrush}">
+                                            <TextBlock Text="{x:Bind Kind, Mode=OneWay, Converter={StaticResource KindLabel}}" FontSize="10" FontWeight="SemiBold" Foreground="{ThemeResource RedBrightBrush}" />
                                         </Border>
-                                        <Border CornerRadius="10" Padding="7,3" Background="#24E82230">
-                                            <TextBlock Text="{x:Bind PortCountText, Mode=OneWay}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource RedBrightBrush}" />
+                                        <Border CornerRadius="10" Padding="7,3" Background="{ThemeResource RedPillBrush}">
+                                            <TextBlock Text="{x:Bind PortCountText, Mode=OneWay}" FontSize="10" FontWeight="SemiBold" Foreground="{ThemeResource RedBrightBrush}" />
                                         </Border>
-                                        <TextBlock Text="{x:Bind LatencyText, Mode=OneWay}" FontSize="10" FontFamily="Consolas" Foreground="{StaticResource FaintBrush}" VerticalAlignment="Center" />
+                                        <TextBlock Text="{x:Bind LatencyText, Mode=OneWay}" FontSize="10" FontFamily="Consolas" Foreground="{ThemeResource FaintBrush}" VerticalAlignment="Center" />
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
@@ -245,7 +280,7 @@
                 <ListView Grid.Column="0" ItemsSource="{x:Bind VM.KnownDevices}" SelectionMode="None">
                     <ListView.ItemTemplate>
                         <DataTemplate x:DataType="core:KnownDevice">
-                            <Border Margin="0,0,12,6" Background="{StaticResource CardBrush}" BorderBrush="{StaticResource StrokeBrush}"
+                            <Border Margin="0,0,12,6" Background="{ThemeResource CardBrush}" BorderBrush="{ThemeResource StrokeBrush}"
                                     BorderThickness="1" CornerRadius="11" Padding="12">
                                 <Grid ColumnSpacing="12">
                                     <Grid.ColumnDefinitions>
@@ -258,12 +293,12 @@
                                         <FontIcon Glyph="{x:Bind Kind, Converter={StaticResource KindGlyph}}" FontFamily="Segoe Fluent Icons" Foreground="White" FontSize="14" />
                                     </Border>
                                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                        <TextBlock Text="{x:Bind Name}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Text="{x:Bind SubText}" FontSize="10" Foreground="{StaticResource DimBrush}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{x:Bind Name}" FontSize="13" FontWeight="SemiBold" Foreground="{ThemeResource TextBrush}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{x:Bind SubText}" FontSize="10" Foreground="{ThemeResource DimBrush}" TextTrimming="CharacterEllipsis" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                                        <TextBlock Text="{x:Bind LastIp}" FontSize="12" FontFamily="Consolas" Foreground="{StaticResource RedBrightBrush}" />
-                                        <TextBlock Text="{x:Bind StatusText}" FontSize="10" Foreground="{StaticResource FaintBrush}" />
+                                        <TextBlock Text="{x:Bind LastIp}" FontSize="12" FontFamily="Consolas" Foreground="{ThemeResource RedBrightBrush}" />
+                                        <TextBlock Text="{x:Bind StatusText}" FontSize="10" Foreground="{ThemeResource FaintBrush}" />
                                     </StackPanel>
                                     <Button Grid.Column="3" Style="{StaticResource GhostButton}" VerticalAlignment="Center"
                                             Click="OnWakeKnown" Tag="{x:Bind}"
@@ -290,12 +325,12 @@
                     <ListView ItemsSource="{x:Bind VM.Scans}" SelectionMode="None">
                         <ListView.ItemTemplate>
                             <DataTemplate x:DataType="core:ScanRecord">
-                                <Border Margin="0,0,0,6" Background="{StaticResource CardBrush}" BorderBrush="{StaticResource StrokeBrush}"
+                                <Border Margin="0,0,0,6" Background="{ThemeResource CardBrush}" BorderBrush="{ThemeResource StrokeBrush}"
                                         BorderThickness="1" CornerRadius="12" Padding="12">
                                     <StackPanel Spacing="4">
-                                        <TextBlock Text="{x:Bind Title}" FontSize="12" FontWeight="SemiBold" />
-                                        <TextBlock Text="{x:Bind Sub}" FontSize="10" Foreground="{StaticResource FaintBrush}" TextWrapping="Wrap" />
-                                        <TextBlock Text="{x:Bind ChangesText}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource RedBrightBrush}"
+                                        <TextBlock Text="{x:Bind Title}" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource TextBrush}" />
+                                        <TextBlock Text="{x:Bind Sub}" FontSize="10" Foreground="{ThemeResource FaintBrush}" TextWrapping="Wrap" />
+                                        <TextBlock Text="{x:Bind ChangesText}" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource RedBrightBrush}"
                                                    Visibility="{x:Bind HasChanges, Converter={StaticResource BoolVis}}" />
                                     </StackPanel>
                                 </Border>
@@ -307,7 +342,7 @@
         </Grid>
 
         <!-- ============ DETAILBEREICH ============ -->
-        <Border Grid.Column="3" Width="390" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource StrokeBrush}" BorderThickness="1,0,0,0"
+        <Border Grid.Column="3" Width="390" Background="{ThemeResource PanelBrush}" BorderBrush="{ThemeResource StrokeBrush}" BorderThickness="1,0,0,0"
                 Visibility="{x:Bind VM.DetailVisible, Mode=OneWay, Converter={StaticResource BoolVis}}">
             <ScrollViewer>
                 <StackPanel Padding="18" Spacing="16">
@@ -316,14 +351,14 @@
                             <FontIcon Glyph="{x:Bind VM.SelectedDevice.Kind, Mode=OneWay, Converter={StaticResource KindGlyph}}" FontFamily="Segoe Fluent Icons" Foreground="White" FontSize="26" />
                         </Border>
                         <Button HorizontalAlignment="Right" VerticalAlignment="Top" Click="OnCloseDetail"
-                                Background="{StaticResource CardBrush}" CornerRadius="20" Padding="8">
-                            <FontIcon Glyph="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12" Foreground="{StaticResource DimBrush}" />
+                                Background="{ThemeResource CardBrush}" CornerRadius="20" Padding="8">
+                            <FontIcon Glyph="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12" Foreground="{ThemeResource DimBrush}" />
                         </Button>
                     </Grid>
                     <StackPanel Spacing="4">
-                        <TextBlock Text="{x:Bind VM.SelectedDevice.DisplayName, Mode=OneWay}" FontSize="20" FontWeight="Bold" IsTextSelectionEnabled="True" TextWrapping="Wrap" />
-                        <TextBlock Text="{x:Bind VM.SelectedDevice.Ip, Mode=OneWay}" FontSize="14" FontFamily="Consolas" Foreground="{StaticResource RedBrightBrush}" IsTextSelectionEnabled="True" />
-                        <TextBlock Text="{x:Bind VM.SelectedOsGuess, Mode=OneWay}" FontSize="12" Foreground="{StaticResource DimBrush}"
+                        <TextBlock Text="{x:Bind VM.SelectedDevice.DisplayName, Mode=OneWay}" FontSize="20" FontWeight="Bold" Foreground="{ThemeResource TextBrush}" IsTextSelectionEnabled="True" TextWrapping="Wrap" />
+                        <TextBlock Text="{x:Bind VM.SelectedDevice.Ip, Mode=OneWay}" FontSize="14" FontFamily="Consolas" Foreground="{ThemeResource RedBrightBrush}" IsTextSelectionEnabled="True" />
+                        <TextBlock Text="{x:Bind VM.SelectedOsGuess, Mode=OneWay}" FontSize="12" Foreground="{ThemeResource DimBrush}"
                                    Visibility="{x:Bind VM.SelectedOsGuess, Mode=OneWay, Converter={StaticResource TextVis}}" />
                     </StackPanel>
 
@@ -370,8 +405,8 @@
                                                 <TextBlock Text="{x:Bind PortText}" FontSize="12" FontWeight="Bold" FontFamily="Consolas" Foreground="White" HorizontalAlignment="Center" />
                                             </Border>
                                             <StackPanel Grid.Column="1">
-                                                <TextBlock Text="{x:Bind Service}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" />
-                                                <TextBlock Text="{x:Bind Banner}" FontSize="10" FontFamily="Consolas" Foreground="{StaticResource DimBrush}" TextWrapping="Wrap"
+                                                <TextBlock Text="{x:Bind Service}" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource TextBrush}" TextWrapping="Wrap" />
+                                                <TextBlock Text="{x:Bind Banner}" FontSize="10" FontFamily="Consolas" Foreground="{ThemeResource DimBrush}" TextWrapping="Wrap"
                                                            IsTextSelectionEnabled="True" Visibility="{x:Bind HasBanner, Converter={StaticResource BoolVis}}" />
                                             </StackPanel>
                                         </Grid>
@@ -389,8 +424,8 @@
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="core:BonjourService">
                                         <StackPanel Margin="0,2">
-                                            <TextBlock Text="{x:Bind TypeLabel}" FontSize="12" FontWeight="SemiBold" />
-                                            <TextBlock Text="{x:Bind Name}" FontSize="10" Foreground="{StaticResource DimBrush}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{x:Bind TypeLabel}" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource TextBrush}" />
+                                            <TextBlock Text="{x:Bind Name}" FontSize="10" Foreground="{ThemeResource DimBrush}" TextTrimming="CharacterEllipsis" />
                                         </StackPanel>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>

@@ -22,6 +22,7 @@ Betriebssystem, offene Ports, Dienste, Webseiten und Zertifikate.
 - **Verlauf**: jeder Scan wird gespeichert, neue und verschwundene Geräte werden markiert, „zuerst/zuletzt gesehen“
 - **Wake-on-LAN**: Geräte per Magic Packet aufwecken – auch offline Geräte aus dem Verlauf
 - Suche, Detailansicht pro Gerät, **Export als JSON oder CSV**
+- **Hell/Dunkel-Modus**: Darstellung unten in der Seitenleiste umschalten (Standard: Dunkel), wirkt sofort und wird gespeichert
 
 ## Installation
 
@@ -59,10 +60,14 @@ Voraussetzung: Windows 10 (ab 1809) oder Windows 11, 64-Bit.
 | Geräte / Verlauf | ⌘1 / ⌘2 | Buttons „Geräte“ / „Verlauf“ |
 | Export | ⌘E (JSON), Menü „Scan“ (CSV) | Export-Button oben rechts |
 | Eigenes Ziel scannen | CIDR ins Feld „Ziel“ eintragen, z. B. `192.168.1.0/24` | ebenso |
+| Hell/Dunkel | Umschalter „Darstellung“ unten in der Seitenleiste | ebenso |
 
 Der Verlauf wird lokal gespeichert:
 macOS unter `~/Library/Application Support/RedScan/history.json`,
 Windows unter `%LOCALAPPDATA%\RedScan\history.json`.
+Die gewählte Darstellung (Hell/Dunkel) merkt sich macOS in den App-Einstellungen (UserDefaults, Schlüssel `appearance`),
+Windows in `%LOCALAPPDATA%\RedScan\settings.json`. Beim Start lässt sie sich mit `--theme light` bzw. `--theme dark`
+einmalig überschreiben.
 
 ## Selbst bauen
 

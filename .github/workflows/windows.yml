@@ -59,67 +59,156 @@ jobs:
           $zip = "RedScan-Windows.zip"
           Compress-Archive -Path "$dir/*" -DestinationPath $zip -Force
           "zip=$zip" >> $env:GITHUB_OUTPUT
-      - name: Starttest (App starten, scannen, Screenshot)
+      - name: Starttest (App dunkel + hell starten, scannen, Screenshots)
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force smoke | Out-Null
+          Add-Type -AssemblyName System.Drawing, System.Windows.Forms, UIAutomationClient, UIAutomationTypes
+          Add-Type -Namespace W32 -Name Win -MemberDefinition '[DllImport("user32.dll")] public static extern bool MoveWindow(IntPtr h, int x, int y, int w, int ht, bool r);'
           $start = Get-Date
           # Icon der EXE extrahieren (zeigt, ob das Programm-Icon eingebettet ist)
-          Add-Type -AssemblyName System.Drawing
           $exeIcon = [System.Drawing.Icon]::ExtractAssociatedIcon((Resolve-Path "publish\RedScan.exe"))
           $exeIcon.ToBitmap().Save("smoke\exe-icon.png")
           Write-Host "EXE-Icon extrahiert ($($exeIcon.Width)x$($exeIcon.Height))"
-          $dump = Join-Path $PWD "smoke\scan.json"
           # Nur das eigene /24 des Runners scannen (Cloud-Netze sind riesig)
           $ip = (Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway } | Select-Object -First 1).IPv4Address.IPAddress
           $target = ($ip -replace '\.\d+$', '.0') + '/24'
           Write-Host "Runner-IP: $ip  ->  Ziel: $target"
-          $p = Start-Process -FilePath "publish\RedScan.exe" -ArgumentList "--autoscan","--target",$target,"--dump","`"$dump`"","--no-dialogs" -PassThru
-          $null = $p.Handle
-          $alive = $true
-          for ($i = 0; $i -lt 120; $i++) {
-            Start-Sleep -Seconds 2
-            if ($p.HasExited) { $alive = $false; break }
-            if ($i -eq 7) {
-              try {
-                Add-Type -AssemblyName System.Windows.Forms, System.Drawing
-                $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
-                $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
-                [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
-                $bmp.Save("smoke\screenshot-start.png"); Write-Host "Screenshot erstellt"
-              } catch { Write-Host "Screenshot nicht möglich: $_" }
-            }
-            if (Test-Path $dump) { break }
-          }
-          try {
-            Add-Type -AssemblyName System.Windows.Forms, System.Drawing
-            $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
-            $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
-            [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
-            $bmp.Save("smoke\screenshot-ende.png")
-          } catch { }
-          Write-Host "===== startup.log ====="
           $log = Join-Path $env:LOCALAPPDATA "RedScan\startup.log"
-          if (Test-Path $log) { Copy-Item $log smoke\; Get-Content $log } else { Write-Host "(kein Log – App kam nicht bis zum Konstruktor)" }
+          $settings = Join-Path $env:LOCALAPPDATA "RedScan\settings.json"
+          Remove-Item $settings -ErrorAction SilentlyContinue
+
+          function Save-Screen([string]$name) {
+            try {
+              $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+              $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+              [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+              $bmp.Save("smoke\$name"); Write-Host "Screenshot erstellt: $name"
+            } catch { Write-Host "Screenshot nicht möglich ($name): $_" }
+          }
+          function Get-AppWindow($p) {
+            for ($k = 0; $k -lt 20; $k++) {
+              $p.Refresh()
+              if ($p.MainWindowHandle -ne [IntPtr]::Zero) { return [System.Windows.Automation.AutomationElement]::FromHandle($p.MainWindowHandle) }
+              Start-Sleep -Milliseconds 500
+            }
+            throw "Kein Hauptfenster gefunden"
+          }
+          function Find-Element($root, [string]$name, $type) {
+            $c1 = [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty, $name)
+            $c2 = [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ControlTypeProperty, $type)
+            $c = [System.Windows.Automation.AndCondition]::new([System.Windows.Automation.Condition[]]@($c1, $c2))
+            $e = $root.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $c)
+            if (-not $e) { throw "Element '$name' nicht gefunden" }
+            return $e
+          }
+          function Invoke-AppButton($win, [string]$name) {
+            $btn = Find-Element $win $name ([System.Windows.Automation.ControlType]::Button)
+            $btn.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+          }
+          function Show-Details($p, $win) {
+            # Fenster an den Bildschirm anpassen und erstes Gerät öffnen (Detailansicht sichtbar)
+            $b = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+            [W32.Win]::MoveWindow($p.MainWindowHandle, 0, 0, $b.Width, $b.Height, $true) | Out-Null
+            Start-Sleep -Seconds 1
+            $c = [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::IsSelectionItemPatternAvailableProperty, $true)
+            $item = $win.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $c)
+            if ($item) { $item.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select() } else { Write-Host "Kein Gerät zum Auswählen gefunden" }
+          }
+          function Scroll-SidebarEnd($win) {
+            # Seitenleiste ganz nach unten scrollen, damit der DARSTELLUNG-Umschalter sichtbar ist
+            $e = Find-Element $win "Hell" ([System.Windows.Automation.ControlType]::Button)
+            $walker = [System.Windows.Automation.TreeWalker]::ControlViewWalker
+            while ($e -and -not $e.GetCurrentPropertyValue([System.Windows.Automation.AutomationElement]::IsScrollPatternAvailableProperty)) { $e = $walker.GetParent($e) }
+            if (-not $e) { throw "Seitenleiste nicht scrollbar" }
+            $e.GetCurrentPattern([System.Windows.Automation.ScrollPattern]::Pattern).SetScrollPercent([System.Windows.Automation.ScrollPattern]::NoScroll, 100)
+          }
+          function Test-Log([string]$theme) {
+            Write-Host "===== startup.log ($theme) ====="
+            if (-not (Test-Path $log)) { Write-Error "Kein Log ($theme) – App kam nicht bis zum Konstruktor"; exit 1 }
+            Copy-Item $log "smoke\startup-$theme.log"; Get-Content $log
+            $problems = Select-String -Path $log -Pattern "FEHLER|Unbeobachtete" -SimpleMatch:$false
+            Write-Host "Loggröße: $((Get-Item $log).Length) Bytes, Problemeinträge: $($problems.Count)"
+            if ($problems.Count -gt 0) { $problems | Select-Object -First 5 | ForEach-Object { $_.Line }; Write-Error "Fehler im Startprotokoll ($theme)."; exit 1 }
+            if (-not (Select-String -Path $log -Pattern "Fenster-Icon gesetzt" -Quiet)) { Write-Error "Fenster-Icon wurde nicht gesetzt ($theme)."; exit 1 }
+            if (-not (Select-String -Path $log -Pattern "Titelleiste angepasst" -Quiet)) { Write-Error "Dunkle Titelleiste wurde nicht gesetzt ($theme)."; exit 1 }
+          }
+          function Start-ThemeRun([string]$theme) {
+            Remove-Item $log -ErrorAction SilentlyContinue
+            $dump = Join-Path $PWD "smoke\scan-$theme.json"
+            $p = Start-Process -FilePath "publish\RedScan.exe" -ArgumentList "--theme",$theme,"--autoscan","--target",$target,"--dump","`"$dump`"","--no-dialogs" -PassThru
+            $null = $p.Handle
+            $alive = $true
+            for ($i = 0; $i -lt 120; $i++) {
+              Start-Sleep -Seconds 2
+              if ($p.HasExited) { $alive = $false; break }
+              if ($i -eq 7) { Save-Screen "screenshot-start-$theme.png" }
+              if (Test-Path $dump) { break }
+            }
+            if ($alive -and (Test-Path $dump)) { Start-Sleep -Seconds 1; Save-Screen "screenshot-ende-$theme.png" }
+            if (-not $alive) {
+              Get-WinEvent -FilterHashtable @{ LogName = 'Application'; StartTime = $start } -ErrorAction SilentlyContinue |
+                Where-Object { $_.Level -le 2 } | Format-List TimeCreated, ProviderName, Id, Message | Out-String -Width 300 | Tee-Object smoke\events.txt
+              if (Test-Path $log) { Get-Content $log }
+              Write-Error ("App ($theme) hat sich beendet. ExitCode: 0x{0:X8}" -f $p.ExitCode); exit 1
+            }
+            if (-not (Test-Path $dump)) { if (Test-Path $log) { Get-Content $log }; Stop-Process $p -Force; Write-Error "Scan ($theme) wurde nicht innerhalb von 4 Minuten fertig."; exit 1 }
+            $devices = Get-Content $dump -Raw | ConvertFrom-Json
+            Write-Host "===== Scan-Ergebnis ($theme): $($devices.Count) Geräte ====="
+            $devices | Select-Object Ip, Mac, Vendor, Kind, @{n='Ports';e={($_.OpenPorts | ForEach-Object Port) -join ' '}} | Format-Table -AutoSize | Out-String -Width 200 | Write-Host
+            if ($devices.Count -gt 60) { Write-Error "Unplausibel viele Geräte ($($devices.Count)) – Proxy-ARP wird nicht gefiltert."; exit 1 }
+            return $p
+          }
+          function Stop-ThemeRun($p, [string]$theme) {
+            Start-Sleep -Seconds 2
+            if ($p.HasExited) { Write-Error "App ($theme) ist nach dem Scan abgestürzt."; exit 1 }
+            Stop-Process $p -Force
+            Start-Sleep -Seconds 1
+            Test-Log $theme
+          }
+
+          # ---- 1) Hell (--theme light): darf den gespeicherten Wert NICHT ändern ----
+          $p = Start-ThemeRun "light"
+          $win = Get-AppWindow $p
+          Show-Details $p $win; Start-Sleep -Seconds 2; Save-Screen "screenshot-light.png"
+          Scroll-SidebarEnd $win; Start-Sleep -Seconds 1; Save-Screen "screenshot-light-unten.png"
+          Stop-ThemeRun $p "light"
+          if (-not (Select-String -Path $log -Pattern "Darstellung: hell \(Kommandozeile\)" -Quiet)) { Write-Error "--theme light wurde nicht übernommen."; exit 1 }
+          if (Test-Path $settings) { Get-Content $settings; Write-Error "--theme hat settings.json verändert."; exit 1 }
+
+          # ---- 2) Dunkel (--theme dark) + Live-Umschalten auf Hell ----
+          $p = Start-ThemeRun "dark"
+          Copy-Item "smoke\screenshot-ende-dark.png" "smoke\screenshot-ende.png"
+          $win = Get-AppWindow $p
+          Show-Details $p $win; Start-Sleep -Seconds 2; Save-Screen "screenshot-dark.png"
+          Scroll-SidebarEnd $win; Start-Sleep -Seconds 1; Save-Screen "screenshot-dark-unten.png"
+          Invoke-AppButton $win "Hell"; Start-Sleep -Seconds 2; Save-Screen "screenshot-umgeschaltet-hell.png"
+          Stop-ThemeRun $p "dark"
+          if (-not (Select-String -Path $log -Pattern "Darstellung: dunkel \(Kommandozeile\)" -Quiet)) { Write-Error "--theme dark wurde nicht übernommen."; exit 1 }
+          if (-not (Select-String -Path $log -Pattern "Darstellung gewechselt: hell" -Quiet)) { Write-Error "Umschalten auf Hell hat nicht funktioniert."; exit 1 }
+          if (-not (Test-Path $settings)) { Write-Error "settings.json wurde beim Umschalten nicht gespeichert."; exit 1 }
+          $saved = Get-Content $settings -Raw | ConvertFrom-Json
+          Write-Host "settings.json: $(Get-Content $settings -Raw)"
+          if ($saved.theme -ne "light") { Write-Error "settings.json enthält nicht theme=light."; exit 1 }
+
+          # ---- 3) Neustart ohne --theme: gespeicherte Wahl (Hell) wird wiederhergestellt ----
+          Remove-Item $log -ErrorAction SilentlyContinue
+          $p = Start-Process -FilePath "publish\RedScan.exe" -ArgumentList "--no-dialogs" -PassThru
+          $null = $p.Handle
+          Start-Sleep -Seconds 8
+          if ($p.HasExited) { Write-Error "App (gespeichert) hat sich beendet."; exit 1 }
+          $win = Get-AppWindow $p
+          Save-Screen "screenshot-gespeichert-hell.png"
+          Invoke-AppButton $win "Dunkel"; Start-Sleep -Seconds 2
+          Save-Screen "screenshot-zurueck-dunkel.png"
+          Stop-ThemeRun $p "gespeichert"
+          if (-not (Select-String -Path $log -Pattern "Darstellung: hell$" -Quiet)) { Write-Error "Gespeicherte Darstellung (hell) wurde nicht wiederhergestellt."; exit 1 }
+          if ((Get-Content $settings -Raw | ConvertFrom-Json).theme -ne "dark") { Write-Error "Zurückschalten auf Dunkel wurde nicht gespeichert."; exit 1 }
+
           Write-Host "===== Windows-Ereignisprotokoll (Fehler) ====="
           Get-WinEvent -FilterHashtable @{ LogName = 'Application'; StartTime = $start } -ErrorAction SilentlyContinue |
             Where-Object { $_.Level -le 2 } | Format-List TimeCreated, ProviderName, Id, Message | Out-String -Width 300 | Tee-Object smoke\events.txt
-          if (-not $alive) { Write-Error ("App hat sich beendet. ExitCode: 0x{0:X8}" -f $p.ExitCode); exit 1 }
-          if (-not (Test-Path $dump)) { Stop-Process $p -Force; Write-Error "Scan wurde nicht innerhalb von 4 Minuten fertig."; exit 1 }
-          $devices = Get-Content $dump -Raw | ConvertFrom-Json
-          Write-Host "===== Scan-Ergebnis: $($devices.Count) Geräte ====="
-          $devices | Select-Object Ip, Mac, Vendor, Kind, @{n='Ports';e={($_.OpenPorts | ForEach-Object Port) -join ' '}} | Format-Table -AutoSize | Out-String -Width 200
-          if ($devices.Count -gt 60) { Write-Error "Unplausibel viele Geräte ($($devices.Count)) – Proxy-ARP wird nicht gefiltert."; exit 1 }
-          $logSize = (Get-Item $log).Length
-          $problems = Select-String -Path $log -Pattern "FEHLER|Unbeobachtete" -SimpleMatch:$false
-          Write-Host "Loggröße: $logSize Bytes, Problemeinträge: $($problems.Count)"
-          if ($problems.Count -gt 0) { $problems | Select-Object -First 5 | ForEach-Object { $_.Line }; Write-Error "Fehler im Startprotokoll."; exit 1 }
-          if (-not (Select-String -Path $log -Pattern "Fenster-Icon gesetzt" -Quiet)) { Write-Error "Fenster-Icon wurde nicht gesetzt."; exit 1 }
-          if (-not (Select-String -Path $log -Pattern "Titelleiste angepasst" -Quiet)) { Write-Error "Dunkle Titelleiste wurde nicht gesetzt."; exit 1 }
-          Start-Sleep -Seconds 2
-          if ($p.HasExited) { Write-Error "App ist nach dem Scan abgestürzt."; exit 1 }
-          Stop-Process $p -Force
-          Write-Host "Starttest bestanden: App läuft und hat gescannt."
+          Write-Host "Starttest bestanden: App läuft und hat gescannt (dunkel + hell), Umschalten und Speichern funktionieren."
       - name: Starttest-Ergebnisse hochladen
         if: always()
         uses: actions/upload-artifact@v4

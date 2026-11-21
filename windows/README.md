@@ -20,6 +20,7 @@ Gebaut und auf echtem Windows getestet über GitHub Actions.
 - **Verlauf**: jeder Scan wird gespeichert, neue und verschwundene Geräte werden markiert
 - **Wake-on-LAN**: Geräte per Magic Packet aufwecken – auch offline Geräte aus dem Verlauf
 - Kachelansicht mit Suche und Detailbereich, **Export als JSON oder CSV**
+- **Hell/Dunkel-Modus**: Umschalter „Darstellung“ unten in der Seitenleiste (Standard: Dunkel), wirkt sofort, gespeichert in `%LOCALAPPDATA%\RedScan\settings.json`
 
 ## Installation
 

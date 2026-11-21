@@ -24,8 +24,12 @@ public sealed partial class RootView : UserControl
                 UpdateRadar();
         };
         Loaded += (_, _) => UpdateRadar();
+        ThemeService.Changed += VM.RaiseTheme;
         App.Log("Oberfläche aufgebaut");
     }
+
+    private void OnThemeDark(object sender, RoutedEventArgs e) => ThemeService.Set(AppTheme.Dark);
+    private void OnThemeLight(object sender, RoutedEventArgs e) => ThemeService.Set(AppTheme.Light);
 
     /// <summary>Kommandozeile: --autoscan startet sofort einen Scan, --dump &lt;Pfad&gt; speichert das Ergebnis als JSON.</summary>
     private async void OnLoaded(object sender, RoutedEventArgs e)

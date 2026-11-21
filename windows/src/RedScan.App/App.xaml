@@ -10,6 +10,42 @@
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
             </ResourceDictionary.MergedDictionaries>
 
+            <!-- Farb-Tokens je Darstellung (Default = Dunkel, unverändert; Light = Hell) -->
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Default">
+                    <SolidColorBrush x:Key="BgBrush" Color="#0D0809" />
+                    <SolidColorBrush x:Key="PanelBrush" Color="#14090B" />
+                    <SolidColorBrush x:Key="CardBrush" Color="#1D1012" />
+                    <SolidColorBrush x:Key="CardHiBrush" Color="#2A1316" />
+                    <SolidColorBrush x:Key="TextBrush" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="DimBrush" Color="#8CFFFFFF" />
+                    <SolidColorBrush x:Key="FaintBrush" Color="#52FFFFFF" />
+                    <SolidColorBrush x:Key="StrokeBrush" Color="#14FFFFFF" />
+                    <SolidColorBrush x:Key="InsetBrush" Color="#4D000000" />
+                    <SolidColorBrush x:Key="RedBrush" Color="#E82230" />
+                    <SolidColorBrush x:Key="RedBrightBrush" Color="#FF566B" />
+                    <SolidColorBrush x:Key="RedTintBrush" Color="#22E82230" />
+                    <SolidColorBrush x:Key="RedPillBrush" Color="#24E82230" />
+                    <SolidColorBrush x:Key="RedTintStrokeBrush" Color="#73E82230" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="BgBrush" Color="#F6F1F2" />
+                    <SolidColorBrush x:Key="PanelBrush" Color="#FBF7F7" />
+                    <SolidColorBrush x:Key="CardBrush" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="CardHiBrush" Color="#F7E6E8" />
+                    <SolidColorBrush x:Key="TextBrush" Color="#1A0F11" />
+                    <SolidColorBrush x:Key="DimBrush" Color="#9E1A0F11" />
+                    <SolidColorBrush x:Key="FaintBrush" Color="#661A0F11" />
+                    <SolidColorBrush x:Key="StrokeBrush" Color="#1A1A0F11" />
+                    <SolidColorBrush x:Key="InsetBrush" Color="#0D1A0F11" />
+                    <SolidColorBrush x:Key="RedBrush" Color="#E82230" />
+                    <SolidColorBrush x:Key="RedBrightBrush" Color="#C8102E" />
+                    <SolidColorBrush x:Key="RedTintBrush" Color="#1AE82230" />
+                    <SolidColorBrush x:Key="RedPillBrush" Color="#1AE82230" />
+                    <SolidColorBrush x:Key="RedTintStrokeBrush" Color="#4DE82230" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+
             <local:BoolToVisibilityConverter x:Key="BoolVis" xmlns:local="using:RedScan.App" />
             <local:CountToVisibilityConverter x:Key="CountVis" xmlns:local="using:RedScan.App" />
             <local:TextToVisibilityConverter x:Key="TextVis" xmlns:local="using:RedScan.App" />
@@ -18,24 +54,10 @@
             <local:KindGlyphConverter x:Key="KindGlyph" xmlns:local="using:RedScan.App" />
             <local:KindLabelConverter x:Key="KindLabel" xmlns:local="using:RedScan.App" />
 
-            <!-- Rotes Farbschema -->
-            <Color x:Key="BgColor">#0D0809</Color>
-            <Color x:Key="PanelColor">#14090B</Color>
-            <Color x:Key="CardColor">#1D1012</Color>
-            <Color x:Key="CardHiColor">#2A1316</Color>
+            <!-- Rotes Farbschema: Akzentfarben (Verlauf ist in beiden Modi gleich) -->
             <Color x:Key="RedColor">#E82230</Color>
             <Color x:Key="RedBrightColor">#FF566B</Color>
             <Color x:Key="RedDeepColor">#6B0A12</Color>
-
-            <SolidColorBrush x:Key="BgBrush" Color="{StaticResource BgColor}" />
-            <SolidColorBrush x:Key="PanelBrush" Color="{StaticResource PanelColor}" />
-            <SolidColorBrush x:Key="CardBrush" Color="{StaticResource CardColor}" />
-            <SolidColorBrush x:Key="CardHiBrush" Color="{StaticResource CardHiColor}" />
-            <SolidColorBrush x:Key="RedBrush" Color="{StaticResource RedColor}" />
-            <SolidColorBrush x:Key="RedBrightBrush" Color="{StaticResource RedBrightColor}" />
-            <SolidColorBrush x:Key="DimBrush" Color="#8CFFFFFF" />
-            <SolidColorBrush x:Key="FaintBrush" Color="#52FFFFFF" />
-            <SolidColorBrush x:Key="StrokeBrush" Color="#14FFFFFF" />
 
             <LinearGradientBrush x:Key="RedGradient" StartPoint="0,0" EndPoint="1,1">
                 <GradientStop Color="{StaticResource RedBrightColor}" Offset="0" />
@@ -55,8 +77,8 @@
             </Style>
 
             <Style x:Key="GhostButton" TargetType="Button">
-                <Setter Property="Background" Value="#22E82230" />
-                <Setter Property="Foreground" Value="{StaticResource RedBrightBrush}" />
+                <Setter Property="Background" Value="{ThemeResource RedTintBrush}" />
+                <Setter Property="Foreground" Value="{ThemeResource RedBrightBrush}" />
                 <Setter Property="BorderThickness" Value="0" />
                 <Setter Property="Padding" Value="12,8" />
                 <Setter Property="CornerRadius" Value="10" />
@@ -64,15 +86,15 @@
             </Style>
 
             <Style x:Key="CardBorder" TargetType="Border">
-                <Setter Property="Background" Value="{StaticResource CardBrush}" />
-                <Setter Property="BorderBrush" Value="{StaticResource StrokeBrush}" />
+                <Setter Property="Background" Value="{ThemeResource CardBrush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource StrokeBrush}" />
                 <Setter Property="BorderThickness" Value="1" />
                 <Setter Property="CornerRadius" Value="14" />
                 <Setter Property="Padding" Value="14" />
             </Style>
 
             <Style x:Key="SectionLabel" TargetType="TextBlock">
-                <Setter Property="Foreground" Value="{StaticResource RedBrightBrush}" />
+                <Setter Property="Foreground" Value="{ThemeResource RedBrightBrush}" />
                 <Setter Property="FontSize" Value="11" />
                 <Setter Property="FontWeight" Value="Bold" />
                 <Setter Property="CharacterSpacing" Value="80" />
